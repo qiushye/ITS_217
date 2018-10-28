@@ -20,11 +20,13 @@ class imputation:
         self.max_iter = max_iter
         self.est_data = miss_data.copy()
         self.exec_time = 0
+        self.day_axis = 1
 
         if self.miss_ratio == 0:
             raise RuntimeError('input data is complete')
 
-    def pre_impute(self, day_axis=1):
+    def pre_impute(self):  # 预填充，默认第二个维度是日期
+        day_axis = self.day_axis
         sparse_data = self.miss_data
         pos = np.where(self.W == False)
         for p in range(len(pos[0])):

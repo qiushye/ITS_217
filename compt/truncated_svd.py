@@ -22,12 +22,12 @@ class truncator:
         SG = []         # singular value list
         for i in range(N):
             B = SD.unfold(i)
-            U, sigma, VT = scipy.linalg.svd(B, 0)
+            U, sigma, _ = scipy.linalg.svd(B, 0)
             row_s = len(sigma)
             mat_sig = scipy.zeros((row_s, row_s))
             for j in range(row_s):
                 mat_sig[j, j] = sigma[j]
-                if sum(sigma[:j])/sum(sigma) > p:
+                if sum(sigma[:j])/sum(sigma) > self.truncate_rate:
                     SG.append(sigma[j])
                     break
 
