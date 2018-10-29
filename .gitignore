@@ -1,0 +1,4 @@
+# 忽略data
+data/
+# 忽略图像
+img_test/

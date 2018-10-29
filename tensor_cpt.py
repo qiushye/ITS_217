@@ -181,6 +181,187 @@ def show_img(X,RMSE_list,MAE_list,name_list):
         plt.close()
     return 0
 
+def compare_iter(ori_speeddata,miss_data,miss_pos,W):
+    sp = np.shape(miss_data)
+    rank_set = [0,0,0]
+    main_rate = 0.9
+    alpha = [1/3,1/3,1/3]
+    beta = [0.1,0.1,0.1]
+    beta1 = beta.copy()
+    gama = [2,2,2]
+    lou = 1e-3
+    K = 100
+    conv = 1e-4
+    conv_list = np.arange(1e-4,1e-3,5e-5)
+    K_list = [50+10*count for count in range(16)]
+
+    RMSE_lrtc_list,MAE_lrtc_list = [],[]
+    RMSE_silrtc_list,MAE_silrtc_list = [],[]
+    RMSE_halrtc_list,MAE_halrtc_list = [],[]
+    range_list = conv_list
+    for conv in conv_list:
+        est_lrtc = lrtc_cpt(miss_data,beta,alpha,gama,conv,K,W)
+        RMSE_lrtc,MAPE_lrtc,RSE_lrtc,MAE_lrtc = rmse_mape_rse(est_lrtc,ori_speeddata,W)
+        RMSE_lrtc_list.append(RMSE_lrtc)
+        MAE_lrtc_list.append(MAE_lrtc)
+        est_silrtc = silrtc_cpt(miss_data,alpha,beta1,conv,K)
+        RMSE_silrtc,MAPE_silrtc,RSE_silrtc,MAE_silrtc = rmse_mape_rse(est_silrtc,ori_speeddata,W)
+        RMSE_silrtc_list.append(RMSE_silrtc)
+        MAE_silrtc_list.append(MAE_silrtc)
+        est_halrtc = halrtc_cpt(miss_data,lou,conv,K,W)
+        RMSE_halrtc,MAPE_halrtc,RSE_halrtc,MAE_halrtc = rmse_mape_rse(est_halrtc,ori_speeddata,W)
+        RMSE_halrtc_list.append(RMSE_halrtc)
+        MAE_halrtc_list.append(MAE_halrtc)
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot(range_list,RMSE_lrtc_list,'r--^',label='lrtc')
+    ax.plot(range_list,RMSE_silrtc_list,'r--s',label='silrtc')
+    ax.plot(range_list,RMSE_halrtc_list,'r--D',label='halrtc')
+    ax.legend(loc='best')
+    plt.savefig(img_dir+'compare_conv_rmse.png')
+    plt.close()
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot(range_list,MAE_lrtc_list,'r--^',label='lrtc')
+    ax.plot(range_list,MAE_silrtc_list,'r--s',label='silrtc')
+    ax.plot(range_list,MAE_halrtc_list,'r--D',label='halrtc')
+    ax.legend(loc='best')
+    plt.savefig(img_dir+'compare_conv_mae.png')
+    plt.close()
+
+    #show_img(K_list,RMSE_tc,MAE_tc,['lrtc','silrtc','halrtc'])
+    return 0
+
+def compare_methods(ori_speeddata,ori_W):
+    RM_dict,MA_dict,RS_dict,MP_dict = {},{},{},{}
+    rt_dict = {}
+    miss_list = []
+    eva_dict = {'rmse':RM_dict,'mae':MA_dict,'mape':MP_dict}
+    for i in range(8):
+        print('----'+str(i)+'----')
+        miss_ratio = round(0.1*(i+1),2)
+
+        miss_path = data_dir+'miss_'+str(miss_ratio)+''.join(['_'+str(ch) for ch in data_size])+'.mat'
+        if not os.path.exists(miss_path):
+            gene_rand_sparse(ori_speeddata,miss_ratio,miss_path)
+        miss_data,W_miss,tm_ratio = get_sparsedata(miss_path)
+        W = (W_miss==False)
+        rW = W | (ori_W == False)
+
+        miss_list.append(round(tm_ratio * 100,1))
+        #预填充
+        time_s = time.time()
+        miss_data = pre_impute(miss_data, W)
+        time_e = time.time()
+        rm, mp, rs, ma = rmse_mape_rse(miss_data, ori_speeddata, rW)
+        km = 'pre-impute'
+        if km not in RM_dict:
+            RM_dict[km], MP_dict[km], RS_dict[km], MA_dict[km] = [], [], [], []
+            rt_dict[km] = []
+        RM_dict[km].append(rm)
+        MA_dict[km].append(ma)
+        MP_dict[km].append(mp)
+        RS_dict[km].append(rs)
+        rt_dict[km].append(round(time_e - time_s, 1))
+        """
+        #参数
+        p = 0.7
+        K = 100     #iterations
+        F_thre = 1e-4  #F_norm convergence threshold
+
+        #halrtc
+        time_s = time.time()
+        lou = 1 / T_SVD(miss_data, p)[0][0]
+        est_halrtc = halrtc_cpt(miss_data,lou,F_thre,K,W,alpha=[1/3,1/3,1/3])
+        time_e = time.time()
+        rm, mp, rs, ma = rmse_mape_rse(est_halrtc,ori_speeddata,rW)
+        km = 'HaLRTC'
+        if km not in RM_dict:
+            RM_dict[km], MP_dict[km], RS_dict[km], MA_dict[km] = [], [], [], []
+            rt_dict[km] = []
+        RM_dict[km].append(rm)
+        MA_dict[km].append(ma)
+        MP_dict[km].append(mp)
+        RS_dict[km].append(rs)
+        rt_dict[km].append(round(time_e - time_s,1))
+
+        #Kmeans+halrtc
+        time_s = time.time()
+        K_n = 4   #cluster_num
+        est_kmeans = Kmeans_ha(miss_data, W, K_n, K, F_thre, p)
+        time_e = time.time()
+        rm,mp,rs,ma = rmse_mape_rse(est_kmeans,ori_speeddata,rW)
+        km = 'HaLRTC-CSP'
+        if km not in RM_dict:
+            RM_dict[km],MP_dict[km],RS_dict[km],MA_dict[km] = [],[],[],[]
+            rt_dict[km] = []
+        RM_dict[km].append(rm)
+        MA_dict[km].append(ma)
+        MP_dict[km].append(mp)
+        RS_dict[km].append(rs)
+        rt_dict[km].append(round(time_e - time_s,1))
+        '''
+        #STD
+        time_s = time.time()
+        ap,lm,thre = 2e-10,0.05,0.1
+        est_STD = STD_cpt(miss_data, W, thre, ap, lm, p)
+        time_e = time.time()
+        rm, mp, rs, ma = rmse_mape_rse(est_STD, ori_speeddata, rW)
+        km = 'STD'
+        if km not in RM_dict:
+            RM_dict[km], MP_dict[km], RS_dict[km], MA_dict[km] = [], [], [], []
+            rt_dict[km] = []
+        RM_dict[km].append(rm)
+        MA_dict[km].append(ma)
+        MP_dict[km].append(mp)
+        RS_dict[km].append(rs)
+        rt_dict[km].append(round(time_e - time_s,1))
+        '''
+        #BPCA
+        time_s = time.time()
+        est_BPCA = BPCA_cpt(miss_data, p)
+        time_e = time.time()
+        rm, mp, rs, ma = rmse_mape_rse(est_BPCA, ori_speeddata, rW)
+        km = 'BPCA'
+        if km not in RM_dict:
+            RM_dict[km], MP_dict[km], RS_dict[km], MA_dict[km] = [], [], [], []
+            rt_dict[km] = []
+        RM_dict[km].append(rm)
+        MA_dict[km].append(ma)
+        MP_dict[km].append(mp)
+        RS_dict[km].append(rs)
+        rt_dict[km].append(round(time_e - time_s,1))
+        """
+        
+    eva_dict = {'RMSE':RM_dict,'MAE':MA_dict,'MRE':MP_dict,'Run_Time':rt_dict}
+    metric_dict = {'RMSE':'km/h', 'MAE':'km/h', 'MRE':'%', 'Run_Time':'s'}
+    eva_Ylim = {'RMSE':[2,10],'MAE':[0,5],'MRE':[5,20],'Run_Time':[0,5000]}
+    shape = ['r--o','r--*','r--x','r--^','r--s','r--D']
+    MK = ['o','o','*','*','x','x']
+    CR = ['r','b','y','r','b','y']
+
+    fw = open('compare_methods' + '.txt', 'w')
+    fw.write('methods:'+','.join(list(eva_dict['RMSE'].keys()))+'\n')
+    fw.write('Missing Rate (%):' + ','.join(list(map(str, miss_list))) + '\n')
+    for eva in eva_dict:
+        #fig = plt.figure()
+        #ax = fig.add_subplot(1,1,1)
+        plt.xlabel('Missing Rate (%)')
+        plt.ylabel(eva+' ('+metric_dict[eva]+')')
+        # xticks([-np.pi, -np.pi / 2, 0, np.pi / 2, np.pi],
+        #        [r'$-pi$', r'$-pi/2$', r'$0$', r'$+pi/2$', r'$+pi$'])
+        nl = 0
+        fw.write(eva+':\n')
+        for method in eva_dict[eva]:
+            plt.plot(miss_list,eva_dict[eva][method],color=CR[nl],marker=MK[nl],label='$'+method+'$')
+            fw.write(','.join(list(map(str, eva_dict[eva][method]))) + '\n')
+            nl += 1
+        plt.legend(loc='best')
+        plt.savefig(img_dir+'compare_mr_'+'_'+eva+'.png')
+        plt.close()
+    fw.close()
+         
+    return 0
 
 def svd_vary(sparse_data):
     ds = sparse_data.shape
@@ -371,4 +552,22 @@ if __name__ == '__main__':
     conv = 1e-4
 
 
-   
+    halrtc_para = [3e-3,100,1e-4]
+    [lou,K,conv_thre] = halrtc_para
+    time0 = time.time()
+    #est_halrtc = halrtc_cpt(miss_data, 1.3e-3, 1e-4, 100, W, 0)
+    time1 = time.time()
+    #print('ori_halrtc:', rmse_mape_rse(est_halrtc, ori_speeddata, (W | (ori_W == False))))
+    print('ori_time', str(time1- time0) + 's')
+    K_n = 2
+    labels = SC_1(miss_data, 6, K_n, axis=0)
+    est_SC = cluster_ha(labels, miss_data, W, K_n, halrtc_para, axis=0)
+    time_e = time.time()
+    print('sc_est:',rmse_mape_rse(est_SC, ori_speeddata, W|(ori_W==False)))
+    clr_assign,K_n = road_Kmeans(miss_data,ori_W,K_n,W,axis=0,method='cos')
+    est_kmeans = cluster_ha(clr_assign,miss_data,W,K_n,halrtc_para,axis=0)
+    print('kmeans_est:',rmse_mape_rse(est_kmeans,ori_speeddata,W|(ori_W==False)))
+    time2 = time.time()
+    print('kmeans_time:',time2-time1,'s')
+    sys.exit()
+    cr = range(30)

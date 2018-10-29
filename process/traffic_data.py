@@ -16,7 +16,8 @@ class traffic_data:
             raise RuntimeError('input type error')
 
         self.shape = ori_data.shape
-        self.ori_miss_rate = (ori_data > 0).sum()/ori_data.size
+        self.ori_W = (ori_data > 0)
+        self.ori_miss_rate = self.ori_W.sum()/ori_data.size
         if self.ori_miss_rate > 0:
             W_miss = np.where(ori_data <= 0)
             for i in range(len(W_miss[0])):
@@ -37,10 +38,11 @@ class traffic_data:
 
     def generate_miss(self, miss_ratio, miss_type="rand", miss_path=""):
 
-        if miss_path != '' and os.path.getsize(miss_path) > 0:
+        if miss_path != '' and os.path.exists(miss_path):
             miss_data = scio.loadmat(miss_path)['Speed']
+
             true_miss_ratio = (miss_data > 0).sum() / miss_data.size
-            return miss_path, true_miss_ratio
+            return miss_data, true_miss_ratio
 
         miss_data = self.ori_data.copy()
         dshape = self.shape
@@ -62,7 +64,7 @@ class traffic_data:
         true_miss_ratio = (miss_data > 0).sum() / miss_data.size
 
         if len(miss_path) > 3 and miss_path[-3:] == 'mat':
-            scio.savemat(miss_path, {'Speed': miss_path})
+            scio.savemat(miss_path, {'Speed': miss_data})
 
         return miss_data, true_miss_ratio
 
@@ -85,7 +87,8 @@ class traffic_data:
         W_miss = (W == False)
         ori_data = self.ori_data
         diff_data = np.zeros_like(est_data)+W_miss*(est_data-ori_data)
-        rmse = float((np.sum(diff_data**2)/W_miss.sum())**0.5)
+        rmse = float((np.sum(diff_data ** 2) / W_miss.sum()) ** 0.5)
+        print(rmse)
         mre_mat = np.zeros_like(est_data)
         mre_mat[W_miss] = np.abs(
             (est_data[W_miss]-ori_data[W_miss])/ori_data[W_miss])

@@ -6,9 +6,9 @@ python version >= 3
 import numpy as np
 import time
 import sys
-from Imputation import imputation
+from .Imputation import imputation
 from sktensor import tucker
-from truncated_svd import truncator
+from .truncated_svd import truncator
 from sktensor.dtensor import dtensor
 
 
@@ -24,10 +24,13 @@ class STD(imputation):
         self.ranks = rank_list
         self.lam = lam
 
-    def restruct(self, core, matrix_list):
+    def restruct(self, core, matrix_list, transpose=False):
         X = core.copy()
         for i in range(len(matrix_list)):
-            X = X.ttm(matrix_list[i], i)
+            if transpose:
+                X = X.ttm(matrix_list[i].T, i)
+            else:
+                X = X.ttm(matrix_list[i], i)
         return X
 
     def impute(self):
@@ -51,11 +54,11 @@ class STD(imputation):
                 else:
                     mul2 = np.kron(U_list[1], U_list[0])
 
-            mul3 = core_pre.unfold(i).threshold
-            U_list[i] = (1 - self.alpha * self.lam) * U_list[i] + \
-                self.alpha * np.dot(np.dot(mul1, mul2), mul3)
+                mul3 = core_pre.unfold(i).T
+                U_list[i] = (1 - self.alpha * self.lam) * U_list[i] + \
+                    self.alpha * np.dot(np.dot(mul1, mul2), mul3)
 
-            core_temp = self.restruct(E, U_list)
+            core_temp = self.restruct(E, U_list, transpose=True)
             core = (1 - self.alpha * self.lam) * \
                 core_pre + self.alpha * core_temp
             X = self.restruct(core, U_list)

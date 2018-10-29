@@ -5,17 +5,17 @@ python version >= 3
 
 import time
 import numpy as np
-from Imputation import imputation
+from .Imputation import imputation
 from sktensor.dtensor import dtensor
 
 
-class halrtc(imputation):
+class HaLRTC(imputation):
 
     def __init__(self, miss_data, alpha, lou, threshold, max_iter=100):
         if len(alpha) != 3:
             raise RuntimeError('input rank_list error')
 
-        super(halrtc, self).__init__(miss_data, threshold, max_iter)
+        super(HaLRTC, self).__init__(miss_data, threshold, max_iter)
         self.alpha_vec = alpha
         self.lou = lou
 

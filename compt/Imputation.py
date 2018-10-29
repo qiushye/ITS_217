@@ -3,6 +3,7 @@ created by qiushye on 2018.10.22
 python version >= 3
 """
 import numpy as np
+import time
 
 
 class imputation:
@@ -25,7 +26,8 @@ class imputation:
         if self.miss_ratio == 0:
             raise RuntimeError('input data is complete')
 
-    def pre_impute(self):  # 预填充，默认第二个维度是日期
+    def impute(self):  # 预填充，默认第二个维度是日期
+        time_s = time.time()
         day_axis = self.day_axis
         sparse_data = self.miss_data
         pos = np.where(self.W == False)
@@ -54,4 +56,6 @@ class imputation:
                         sparse_data[:, j, :])/(sparse_data[:, j, :] > 0).sum()
 
         self.miss_data = sparse_data
+        time_e = time.time()
+        self.exec_time = time_e-time_s
         return sparse_data
