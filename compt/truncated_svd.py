@@ -35,7 +35,6 @@ class truncator:
             r_list.append(j)
 
         self.SV_list = SG
-        self.trun_index = j
         self.LSM_list = U_list
         self.rank_list = r_list
-        return SG, j, U_list, r_list
+        return SG, U_list, r_list

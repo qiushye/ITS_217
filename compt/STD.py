@@ -14,14 +14,13 @@ from sktensor.dtensor import dtensor
 
 class STD(imputation):
 
-    def __init__(self, miss_data, threshold, alpha, lam, rank_list, max_iter=500):
+    def __init__(self, miss_data, W, rank_list, alpha, lam, threshold, max_iter=500):
         if len(rank_list) != 3:
             raise RuntimeError('input rank_list error')
 
-        super(STD, self).__init__(miss_data, threshold, max_iter)
+        super(STD, self).__init__(miss_data, W, threshold, max_iter)
         self.ranks = rank_list
         self.alpha = alpha
-        self.ranks = rank_list
         self.lam = lam
 
     def restruct(self, core, matrix_list, transpose=False):
@@ -34,14 +33,15 @@ class STD(imputation):
         return X
 
     def impute(self):
-
+        time_s = time.time()
         X_ori = self.miss_data.copy()
         core, U_list = tucker.hooi(dtensor(X_ori), self.ranks, init='nvecs')
         X = self.restruct(core, U_list)
 
         F_diff = sys.maxsize
         iter = 0
-        while F_diff > self.threshold and iter < self.max_iter:
+        while iter < self.max_iter:
+            F_diff_pre = F_diff
             X_pre = X.copy()
             core_pre = core.copy()
             E = self.W * (X_ori - self.restruct(core_pre, U_list))
@@ -62,7 +62,12 @@ class STD(imputation):
             core = (1 - self.alpha * self.lam) * \
                 core_pre + self.alpha * core_temp
             X = self.restruct(core, U_list)
-            F_diff = np.linalg.norm(X-X_pre)
+            F_diff = np.linalg.norm(X - X_pre)
+            if abs(F_diff-F_diff_pre) > self.threshold:
+                break
+            print('STD:', F_diff)
             iter += 1
-
+        time_e = time.time()
+        self.exec_time = time_e - time_s
+        self.est_data = X
         return X

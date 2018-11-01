@@ -8,13 +8,13 @@ import time
 
 class imputation:
 
-    def __init__(self, miss_data, threshold, max_iter=100):
+    def __init__(self, miss_data, W, threshold, max_iter=100):
         # miss_data type should be numpy.ndarray
         if type(miss_data) != np.ndarray:
             raise RuntimeError('input type error')
 
         self.miss_data = miss_data
-        self.W = miss_data > 0
+        self.W = W
         self.shape = miss_data.shape
         self.miss_ratio = self.W.sum()/miss_data.size
         self.threshold = threshold

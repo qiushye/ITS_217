@@ -11,11 +11,11 @@ from sktensor.dtensor import dtensor
 
 class HaLRTC(imputation):
 
-    def __init__(self, miss_data, alpha, lou, threshold, max_iter=100):
+    def __init__(self, miss_data, W, alpha, lou, threshold, max_iter=100):
         if len(alpha) != 3:
             raise RuntimeError('input rank_list error')
 
-        super(HaLRTC, self).__init__(miss_data, threshold, max_iter)
+        super(HaLRTC, self).__init__(miss_data, W, threshold, max_iter)
         self.alpha_vec = alpha
         self.lou = lou
 
@@ -30,8 +30,8 @@ class HaLRTC(imputation):
         T_temp = X.copy()
 
         for _ in range(N):
-            M[_] = dtensor(np.zeros(np.shape(X)))
-            Y[_] = dtensor(np.zeros(np.shape(X)))
+            M[_] = dtensor(np.zeros_like(X))
+            Y[_] = dtensor(np.zeros_like(X))
 
         for _ in range(self.max_iter):
             X_pre = X.copy()
@@ -48,7 +48,7 @@ class HaLRTC(imputation):
 
             T_temp = (np.sum([M[j]-1/lou*Y[j] for j in range(N)], axis=0))/N
             X[W1] = T_temp[W1]
-            X_Fnorm = np.sum((X-X_pre)**2)
+            X_Fnorm = np.sum((X - X_pre) ** 2)
             if X_Fnorm < self.threshold:
                 break
             for i in range(N):

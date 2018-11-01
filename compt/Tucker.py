@@ -12,11 +12,11 @@ from sktensor.dtensor import dtensor
 
 class tucker_cpt(imputation):
 
-    def __init__(self, miss_data, rank_list, threshold, max_iter=100):
+    def __init__(self, miss_data, W, rank_list, threshold, max_iter=100):
         if len(rank_list) != 3:
             raise RuntimeError('input rank_list error')
 
-        super(tucker_cpt, self).__init__(miss_data, threshold, max_iter)
+        super(tucker_cpt, self).__init__(miss_data, W, threshold, max_iter)
         self.ranks = rank_list
 
     def impute(self):

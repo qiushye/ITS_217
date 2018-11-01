@@ -88,11 +88,10 @@ class traffic_data:
         ori_data = self.ori_data
         diff_data = np.zeros_like(est_data)+W_miss*(est_data-ori_data)
         rmse = float((np.sum(diff_data ** 2) / W_miss.sum()) ** 0.5)
-        print(rmse)
         mre_mat = np.zeros_like(est_data)
         mre_mat[W_miss] = np.abs(
             (est_data[W_miss]-ori_data[W_miss])/ori_data[W_miss])
         mape = float(np.sum(mre_mat)/W_miss.sum())*100
-        rse = float(np.sum(diff_data**2)**0.5/np.sum(ori_data[W_miss]**2)**0.5)
+        # rse = float(np.sum(diff_data**2)**0.5/np.sum(ori_data[W_miss]**2)**0.5)
         mae = float(np.sum(np.abs(diff_data))/W_miss.sum())
-        return round(rmse, precision), round(mape, max(precision-2, 0)), round(rse, precision), round(mae, precision)
+        return round(rmse, precision), round(mape, max(precision-2, 0)), round(mae, precision)

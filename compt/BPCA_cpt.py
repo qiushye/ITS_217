@@ -14,9 +14,9 @@ sys.path.append("..")
 
 
 class BPCA_CPT(imputation):
-    def __init__(self, miss_data, mult_components, threshold, max_iter=100):
-        super(BPCA_CPT, self).__init__(miss_data, threshold, max_iter)
-        self.multi_components = mult_components
+    def __init__(self, miss_data, W, multi_components, threshold, max_iter=100):
+        super(BPCA_CPT, self).__init__(miss_data, W, threshold, max_iter)
+        self.multi_components = multi_components
 
     def impute(self):
         time_s = time.time()
@@ -24,7 +24,8 @@ class BPCA_CPT(imputation):
 
         for i in range(self.shape[0]):
             data = self.miss_data[i]
-            bppca = pca.bppca.BPPCA(data, q=self.multi_components)
+            bppca = pca.bppca.BPPCA(data, q=self.multi_components[i])
+            bppca.fit()
             est_BPCA[i] = bppca.transform_infers()
         time_e = time.time()
         self.exec_time = time_e - time_s

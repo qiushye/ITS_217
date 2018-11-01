@@ -15,9 +15,9 @@ sys.path.append("..")
 
 class HaLRTC_CSP(imputation):
 
-    def __init__(self, miss_data, K, p, threshold, max_iter=100):
+    def __init__(self, miss_data, W, K, p, threshold, max_iter=100):
 
-        super(HaLRTC_CSP, self).__init__(miss_data, threshold, max_iter)
+        super(HaLRTC_CSP, self).__init__(miss_data, W, threshold, max_iter)
         self.K = K
         self.p = p
 
@@ -38,7 +38,8 @@ class HaLRTC_CSP(imputation):
             trun_svd = truncator(m_data, self.p)
             trun_svd.truncated_svd()
             lou = 1/trun_svd.SV_list[0]
-            halrtc = HaLRTC(m_data, alpha, lou, self.threshold, self.max_iter)
+            halrtc = HaLRTC(m_data, WT, alpha, lou,
+                            self.threshold, self.max_iter)
             halrtc.W = WT[labels == j]
             est_data[Clr_mat[j]] = halrtc.impute()
         time_e = time.time()
