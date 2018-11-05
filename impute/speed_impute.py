@@ -24,6 +24,7 @@ threshold = 1e-4
 max_iter = 100
 RAND_MISS = "rand"
 CONT_MISS = "cont"
+metric_dict = {'RMSE': 'km/h', 'MAE': 'km/h', 'MRE': '%', 'Run_Time': 's'}
 
 
 def init():
@@ -36,6 +37,14 @@ def init():
     if not os.path.exists(result_dir):
         os.mkdir(result_dir)
 
+def obtain_ticks(min_value, max_value, interval):
+        start = min_value
+        ticks = []
+        while start <= max_value:
+            ticks.append(start)
+            start += interval
+
+        return ticks
 
 def compare_methods(ori_data, miss_type, number=8, p=0.7):
     td = traffic_data(ori_data)
@@ -115,16 +124,9 @@ def compare_methods(ori_data, miss_type, number=8, p=0.7):
     fw.write('methods:'+','.join(list(methods))+'\n')
     fw.write('Missing Rate (%):' + ','.join(list(map(str, miss_list))) + '\n')
 
-    def obtain_ticks(min_value, max_value, interval):
-        start = min_value
-        ticks = []
-        while start <= max_value:
-            ticks.append(start)
-            start += interval
+    
 
-        return ticks
-
-    metric_dict = {'RMSE': 'km/h', 'MAE': 'km/h', 'MRE': '%', 'Run_Time': 's'}
+    
     MK = ['o', 'o', '*', '*', 'x', 'x']     # marks
     CR = ['r', 'b', 'y', 'r', 'b', 'y']     # colors
     Xlim = [0, 90]
@@ -171,7 +173,7 @@ def compare_C(ori_data, miss_ratio, miss_type, p=0.7):
     hai = imputation(miss_data, W, threshold, max_iter)
     miss_data = hai.impute()
 
-    C_list = list(range(2, 11))
+    C_list = list(range(2, 31))
     eva_list = ['RMSE', 'MRE', 'MAE', 'Run_Time']
     df = pd.DataFrame(0, columns=[0], index=eva_list)
     for C in C_list:
@@ -182,6 +184,37 @@ def compare_C(ori_data, miss_ratio, miss_type, p=0.7):
         eva.append(halrtc_csp.exec_time)
         df[C] = eva
 
+    text_path = result_dir + 'compare_C.txt'
+    Xlabel = 'Clustering Number'
+    fw = open(text_path, 'w')
+    fw.write(Xlabel + ':' + ','.join(list(map(str, C_list)))+'for '+str(tm_ratio)+' missing\n')
+
+    # Xminor = 2
+    Yminor = {'RMSE':0.05, 'MAE':0.05, 'MRE':0.1, 'Run_Time':10}
+    Xlim = [0,32]
+    Ylims = {'RMSE':[2.6,3.0], 'MAE':[1.8,2.1], 'MRE':[6.0,6.6], 'Run_Time':[30,100]}
+    Yticks = {}
+    for eva in Ylims:
+        Yticks[eva] = obtain_ticks(Ylims[eva][0], Ylims[eva][1],Yminor[eva])
+
+    for eva in eva_list:
+        img_path = result_dir+'compare_C_'+miss_type+'_'+eva+'.png'
+        ax = plt.subplot()
+        ax.set_xlabel(Xlabel)
+        ax.set_ylabel(eva+' ('+metric_dict[eva]+')')
+        ax.set_xlim(Xlim)
+        ax.set_ylim(Ylims[eva])
+
+        ax.plot(C_list, df[eva], color='r',marker='o')
+        ax.legend(loc='best')
+        plt.savefig(img_path)
+        plt.close()
+
+        fw.write(eva+':\n')
+        fw.write(','.join(list(map(str, df[eva])))+'\n')
+
+    fw.close()
+    return
 
 if __name__ == "__main__":
 
