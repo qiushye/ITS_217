@@ -62,17 +62,19 @@ def choose_period(road_id_dir):
         period_count_temp[p] = all_period_count[p]
     
     #print common_period
-    return common_period[len(common_period)/2]
+    
         #max_perod_count[max_period] += 1
-    '''while 1:
+    '''
+    while 1:
         try:#所有路段信息具有公共时段
             if len(common_period) != 0:
                 return common_period[0]
         except ValueError:
            print "There is no common period!"
-           '''
+    '''
     #print common_period
     #return min_dic(max_perod_count)
+    return common_period[len(common_period)/2]
 
 #选择10个工作日和4个周末
 def choose_date(period,road_id_dir):
@@ -394,7 +396,7 @@ def seed_select(road_id_dir,threshold,seed_rate,alpha):
     for road1 in all_road:
             #if road1 not in SEED:
                 hybrid_rise_set[road1] = 0
-    for i in range(SEED_num):
+    for _ in range(SEED_num):
         #new_seed = ''
         #hybrid_rise_set = {}
         

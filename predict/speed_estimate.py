@@ -29,18 +29,15 @@ def get_weight(W,road,Un,Ue):
     #print A
     #print UnS
     if len(AS) == 0:
-        print '111'
         return W
     
     elif len(AS) >= len(set(A_S)):
-        print '222'
         Un = UnS
         A = AS
         #W = weight_learning(road,Un,Ue,W,theta,lamda,Tcon,v_diff_temp)
     else:
-        print '333'
         for road1 in A_S:
-            Un1,Ue1 = traffic_trend.create_graph(road1)         #???bug
+            Un1,_ = traffic_trend.create_graph(road1)         #???bug
             #print Un1
             A1 = list(set(Un1)&set(all_road_info[road1][-1]))
             A1S = list(set(A1)&set(SEED))
@@ -57,17 +54,12 @@ def get_weight(W,road,Un,Ue):
             if [road_l,road_j] in Ue or [road_j,road_l] in Ue:
                 #格式road1-road2
                 W[road_l+'-'+road_j] = random()
-    print 'w-----'
-    print A
-    print UnS
-    print W
-    print road
     
     return W
 
 #求UnS中的速度差异
 def V_diff(road,date):
-    Un,Ue = traffic_trend.create_graph(road)
+    Un,_ = traffic_trend.create_graph(road)
     
     UnS = [val for val in Un if val in SEED]
     v_diff = {}
@@ -98,16 +90,13 @@ def speed_diff(W,road,Un,Ue,v_diff):
     #W = get_weight({},road,Un,Ue)
     
     if len(AS) == 0:
-        print '11'
         v_diff[road] = 0
     elif len(AS) >= len(set(A_S)):
         A = AS
-        print '22'
         #W = weight_learning(road,Un,Ue,W,theta,lamda,Tcon,v_diff_temp)
     else:
-        print '33'
         for road1 in A_S:
-            Un1,Ue1 = traffic_trend.create_graph(road1)         #???bug
+            Un1,_ = traffic_trend.create_graph(road1)         #???bug
             #print Un1
             A1 = list(set(Un1)&set(all_road_info[road1][-1]))
             A1S = list(set(A1)&set(SEED))
@@ -121,7 +110,6 @@ def speed_diff(W,road,Un,Ue,v_diff):
     
     #UnS = [val for val in Un if val in SEED]
     #A = list(set(Un)&set(all_road_info[road][-1]))
-    print A
     A_S = [val for val in A if val not in SEED]
     UnS = [val for val in Un if val in SEED]
     for road_j in A:
@@ -139,10 +127,6 @@ def speed_diff(W,road,Un,Ue,v_diff):
     #print diff_est
     #print W
     #A会发生改变?
-    print '1-----'
-    print A
-    print W
-    print diff_est
     for road_j in A:
         res += W[road_j]*diff_est[road_j]
     return res
@@ -154,16 +138,14 @@ def weight_learning(road,Un,Ue,W,theta,lamda,Tcon,v_diff_):
     #V_diff_UnS = {}
     V_diff_est = {}
     #v_diff_final = {}
-    A = [val for val in Un if val != road]
-    UnS = [val for val in Un if val in SEED]
+    # A = [val for val in Un if val != road]
+    # UnS = [val for val in Un if val in SEED]
     
     for date in c_weekday_d:
             v_equal = all_road_info[road][4]
             v = all_road_info[road][0][date]
             V_diff_road[date] = abs(v-v_equal)
             #V_diff_UnS[road][date] = V_diff(road_uns,date)
-    #print V_diff_road
-    #print W
     
     v_diff_sum = 0
     for date in c_weekday_d:
@@ -175,8 +157,6 @@ def weight_learning(road,Un,Ue,W,theta,lamda,Tcon,v_diff_):
     i = 0
     while 1:
         v_diff_org = v_diff_new
-        #print v_diff_sum
-        #print v_diff_org
         #theta = 0.09
         #lamda = 1
         #Tcon = 0.001
@@ -202,7 +182,6 @@ def weight_learning(road,Un,Ue,W,theta,lamda,Tcon,v_diff_):
                         #嵌套循环?
                         #W_value = weight_learning(value,Un_value,Ue_value,W_value,theta,lamda,Tcon,v_diff_)
                         v_diff_j = speed_diff(W_value,value,Un_value,Ue_value,v_diff_)#abs(speed_est(W,v_diff_,theta,lamda,Tcon)-all_road_info[value][0][date])
-                        print "loop"
                     sum_j += (V_diff_est[date]-V_diff_road[date])*v_diff_j
                 W[value] -= theta*(sum_j/len(c_weekday_d)+lamda*W[value])
                 if W[value] < 0:
@@ -266,17 +245,14 @@ def choose_date(seed,period):
 
 def speed_est(road,v_diff_temp,theta,lamda,Tcon,v_diff_):
     if road in SEED:
-        print "choose another non-seed road"
         return -1
     
     #global Un,Ue
     Un,Ue = traffic_trend.create_graph(road)
-    print Un
     
     UnS = [val for val in Un if val in SEED]
     A = list(set(Un)&set(all_road_info[road][-1]))
     AS = [val for val in A if val in SEED]
-    print A
     v_equal = all_road_info[road][4]
     delta_v = traffic_trend.trend_infer(road,Un,Ue)
     
@@ -285,41 +261,29 @@ def speed_est(road,v_diff_temp,theta,lamda,Tcon,v_diff_):
     #print W
     
     if len(AS) == 0:
-        print '1'
         #v_diff_temp[road][date] = 0
         return v_equal
     elif len(AS) >= len(A_S):
-        print '2'
         Un = UnS
         A = AS
         #W = weight_learning(road,Un,Ue,W,theta,lamda,Tcon,v_diff_temp)
     else:
-        print '3'
         for road1 in A_S:
             
-            Un1,Ue1 = traffic_trend.create_graph(road1)         #???bug
+            Un1,_ = traffic_trend.create_graph(road1)         #???bug
             A1 = list(set(Un1)&set(all_road_info[road][-1]))
             #print Un1
             A1S = list(set(A1)&set(SEED))
             A1_S = list(set(A1)-set(SEED))
             if len(A1S) == 0 or len(A1S) < len(A1_S): #1表示road1本身
-                print road1
                 Un = list(set(Un)-set([road1]))
                 A = list(set(A)-set([road1]))
-                print A
-    print A
     
     W = get_weight({},road,Un,Ue)
     #print W
     if len(UnS) == 0:
         return v_equal
-    print "2----"
-    print A
-    print Un
-    print W
     W = weight_learning(road,Un,Ue,W,theta,lamda,Tcon,v_diff_)    
-    print 'W------'
-    print W
     
     
     v_diff = speed_diff(W,road,Un,Ue,v_diff_temp)
@@ -410,7 +374,6 @@ for road1 in non_seed_road:
                     v_temp1[road1] += v
                     if v != 0:
                         date_num += 1
-    print date_num
     v_equal1[road1] = v_temp1[road1]/date_num
     
 #记录非种子路段的Un中的种子个数
@@ -471,10 +434,4 @@ for road in non_seed_road:
         arsr += accu_rate_real[road]/v_equal1[road]
         arsr_num += 1
 mape_real = arsr/arsr_num
-print mape_real
 
-'''
-print speed_est('59567211550',v_diff_equal,theta,lamda,Tcon)
-print all_road_info['59567211550'][4]
-print all_road_info['59567211550'][0]
-'''
