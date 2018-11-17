@@ -1,20 +1,17 @@
+import time
+import numpy as np
+from .halrtc import HaLRTC
+from .truncated_svd import truncator
+from .imputation import imputation
+# from process.traffic_data import traffic_data
+from .traffic_data import traffic_data
 """
 created by qiushye on 2018.10.28
 python version >= 3
 """
 
-from process.traffic_data import traffic_data
-from .Imputation import imputation
-from .truncated_svd import truncator
-from .halrtc import HaLRTC
-import numpy as np
-import time
-import sys
-sys.path.append("..")
-
 
 class HaLRTC_CSP(imputation):
-
     def __init__(self, miss_data, W, K, p, threshold, max_iter=100):
 
         super(HaLRTC_CSP, self).__init__(miss_data, W, threshold, max_iter)
@@ -37,9 +34,9 @@ class HaLRTC_CSP(imputation):
             m_data = sd[labels == j]
             trun_svd = truncator(m_data, self.p)
             trun_svd.truncated_svd()
-            lou = 1/trun_svd.SV_list[0]
-            halrtc = HaLRTC(m_data, WT, alpha, lou,
-                            self.threshold, self.max_iter)
+            lou = 1 / trun_svd.SV_list[0]
+            halrtc = HaLRTC(m_data, WT, alpha, lou, self.threshold,
+                            self.max_iter)
             halrtc.W = WT[labels == j]
             est_data[Clr_mat[j]] = halrtc.impute()
         time_e = time.time()

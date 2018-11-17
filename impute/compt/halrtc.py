@@ -5,12 +5,11 @@ python version >= 3
 
 import time
 import numpy as np
-from .Imputation import imputation
+from .imputation import imputation
 from sktensor.dtensor import dtensor
 
 
 class HaLRTC(imputation):
-
     def __init__(self, miss_data, W, alpha, lou, threshold, max_iter=100):
         if len(alpha) != 3:
             raise RuntimeError('input rank_list error')
@@ -37,18 +36,19 @@ class HaLRTC(imputation):
             X_pre = X.copy()
             for i in range(N):
                 SD = dtensor(X_pre)
-                Matrix = SD.unfold(i)+1/lou*(Y[i].unfold(i))
+                Matrix = SD.unfold(i) + 1 / lou * (Y[i].unfold(i))
 
                 U, sigma, VT = np.linalg.svd(Matrix, 0)
                 row_s = len(sigma)
                 mat_sig = np.zeros((row_s, row_s))
                 for ii in range(row_s):
-                    mat_sig[ii, ii] = max(sigma[ii]-alpha[i]/lou, 0)
+                    mat_sig[ii, ii] = max(sigma[ii] - alpha[i] / lou, 0)
                 M[i] = (np.dot(np.dot(U, mat_sig), VT[:row_s, :])).fold()
 
-            T_temp = (np.sum([M[j]-1/lou*Y[j] for j in range(N)], axis=0))/N
+            T_temp = (np.sum([M[j] - 1 / lou * Y[j]
+                              for j in range(N)], axis=0)) / N
             X[W1] = T_temp[W1]
-            X_Fnorm = np.sum((X - X_pre) ** 2)
+            X_Fnorm = np.sum((X - X_pre)**2)
             if X_Fnorm < self.threshold:
                 break
             for i in range(N):

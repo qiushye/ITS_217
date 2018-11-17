@@ -13,7 +13,11 @@ class road:
         self.id = data_path.split('.')[0]  # id为string格式
         self.start_id = None
         self.end_id = None
+        self.max_v = 100
         df = pd.read_csv(data_path, index_col=0)
+        for col in df.columns:
+            for i in df.index:
+                df[col][i] /= self.max_v  # 归一化
         self.V = df
         delta_V = df.copy()
         V_diff = df.copy()
@@ -25,12 +29,13 @@ class road:
                     return 1
                 else:
                     return -1
+
             delta_V[l] = delta_V[l].map(vary)
             V_diff[l] = V_diff[l].map(lambda x: x - mean)
 
         self.delta_V = delta_V
         self.V_diff = V_diff
-        self.A1 = set()     # 1-hop邻居
+        self.A1 = set()  # 1-hop邻居
         self.A2 = set()  # 2-hop邻居
         self.UN = set()
         self.UE = set()  # 所有连接的边
