@@ -1,6 +1,7 @@
 import math
 import os
 import numpy as np
+import copy
 import pandas as pd
 import road_network
 """
@@ -97,6 +98,7 @@ def complete(raw_dir, interval, data_dir):
             fw.write(dates[j] + ',')
             fw.write(','.join([str(speed) for speed in speed_arr[j]]) + '\n')
         fw.close()
+    return
 
 
 if __name__ == '__main__':
@@ -105,29 +107,73 @@ if __name__ == '__main__':
 
     raw_dir = 'D:/启东数据/启东流量数据/'
     interval = 60
-    complete(raw_dir, interval, data_dir)
+    # complete(raw_dir, interval, data_dir)
     roads_path = data_dir + 'road_map.txt'
     RN = road_network.roadmap(roads_path, data_dir)
 
     train_rate = 0.7
-    time_period = '14'
-    threshold = 0.01
-    lam = 0.05
+    time_period = '19'
+    threshold = 0.001
+    lam = 0.1
     alpha = 0.05
     corr_thre = 0.7
-    sup_rate = 0.1
+    sup_rate = 0.5
     seed_rate = 0.2
     K = int(seed_rate * len(RN.roads))
 
     for id in RN.roads:
         RN.get_info(id, data_dir, time_period, train_rate, corr_thre)
 
-    id = '19'
-    date = '2012-11-14'
+    ori_RN = copy.deepcopy(RN)
 
-    print(RN.road_info['19'].UN)
-    # print(RN.cov_sup(sup_rate, {'19'}))
-    RN.seed_select(K, sup_rate, time_period, train_rate, corr_thre)
-    print(RN.seeds)
-    print(RN.speed_diff_est(id, date, time_period))
+    id = '40'
+    date = '2012-11-17'
+    rs = RN.road_info[id]
+    # for i in rs.UN:
+    #     print(i, RN.road_info[i].V_diff[time_period][date])
+
+    # print(RN.corr(id, '50', time_period, train_rate))
+    # RN.seed_select(K, sup_rate, time_period, train_rate, corr_thre)
+    # print(RN.seeds)
+
+    roads = list(RN.roads.keys())
+    roads.sort(
+        key=lambda l: len(RN.road_info[l].A1 & RN.seeds)* 2 + \
+        len(RN.road_info[l].A2 & RN.seeds), reverse = True
+    )
+    print(roads)
+    trend_same = 0
+    predict_num = len(roads) - len(RN.seeds)
+    MRE = 0
+    for r in roads:
+        if r in RN.seeds:
+            continue
+        print('----' + r + '----')
+        RN.weight_learn(r, train_rate, time_period, threshold, lam, alpha)
+
+        trend_predict = RN.trend_infer(r, date, time_period, train_rate),
+        trend_truth = RN.road_info[r].delta_V[time_period][date]
+        if trend_predict == trend_truth:
+            trend_same += 1
+        print('speed_diff', RN.speed_diff_est(r, date, time_period),
+              RN.road_info[r].V_diff[time_period][date])
+
+        v_est = RN.online_est(r, date, time_period, train_rate)
+        v_ori = RN.road_info[r].V[time_period][date]
+        MRE += abs(v_est - v_ori) / v_ori
+        RN.road_info[r].V[time_period][date] = v_est
+        RN.seeds.add(r)
+
+        print('\n')
+    print(time_period + 'h', MRE / predict_num)
+    print('相同趋势:', trend_same / len(roads))
+    sys.exit()
+    print(
+        RN.trend_infer(id, date, time_period, train_rate),
+        rs.delta_V[time_period][date])
+
+    print(RN.road_info[id].W)
     RN.weight_learn(id, train_rate, time_period, threshold, lam, alpha)
+    print(RN.road_info[id].W)
+    print('speed_diff', RN.speed_diff_est(id, date, time_period),
+          rs.V_diff[time_period][date])

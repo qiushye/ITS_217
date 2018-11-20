@@ -4,7 +4,7 @@ python version >= 3
 """
 
 import pca
-from .Imputation import imputation
+from .imputation import imputation
 from sktensor import tucker, cp
 import numpy as np
 import time
@@ -14,7 +14,8 @@ sys.path.append("..")
 
 
 class BPCA_CPT(imputation):
-    def __init__(self, miss_data, W, multi_components, threshold, max_iter=100):
+    def __init__(self, miss_data, W, multi_components, threshold,
+                 max_iter=100):
         super(BPCA_CPT, self).__init__(miss_data, W, threshold, max_iter)
         self.multi_components = multi_components
 
