@@ -12,12 +12,24 @@ import sys
 sys.path.append('..')
 from impute.compt.halrtc_csp import HaLRTC_CSP
 
-data_dir = './data/'
+cur_dir = os.path.split(os.path.realpath(__file__))[0]
+data_dir = cur_dir + '/data/'
+result_dir = cur_dir + '/result/'
+
 dates = [
     '2012-11-07', '2012-11-08', '2012-11-09', '2012-11-10', '2012-11-11',
     '2012-11-12', '2012-11-13', '2012-11-14', '2012-11-15', '2012-11-16',
     '2012-11-17', '2012-11-18', '2012-11-19', '2012-11-20', '2012-11-21'
 ]
+
+
+def init():
+
+    if not os.path.exists(data_dir):
+        os.mkdir(data_dir)
+
+    if not os.path.exists(result_dir):
+        os.mkdir(result_dir)
 
 
 def speed_extract(file_path, interval, data_dir):
@@ -102,8 +114,7 @@ def complete(raw_dir, interval, data_dir):
 
 
 if __name__ == '__main__':
-    if not os.path.exists(data_dir):
-        os.mkdir(data_dir)
+    init()
 
     raw_dir = 'D:/启东数据/启东流量数据/'
     interval = 60

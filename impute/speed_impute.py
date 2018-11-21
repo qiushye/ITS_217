@@ -17,8 +17,9 @@ import numpy as np
 import os
 
 ori_path = 'D:/GZ_data/60days_tensor.mat'
-data_dir = 'D:/ITS_217/data/'
-result_dir = 'D:/ITS_217/result/'
+cur_dir = os.path.split(os.path.realpath(__file__))[0]
+data_dir = cur_dir + '/data/'
+result_dir = cur_dir + '/result/'
 
 threshold = 1e-4
 max_iter = 100
@@ -62,17 +63,17 @@ def compare_methods(ori_data, miss_type, number=8, p=0.7):
             str(miss_ratio)+''.join(['_'+str(ch) for ch in td.shape])+'.mat'
         miss_data, tm_ratio = td.generate_miss(miss_ratio, miss_type,
                                                miss_path)
-        print(miss_ratio, tm_ratio)
         miss_list.append(tm_ratio * 100)
         W = miss_data > 0
         method_index = 0
+        print(miss_ratio, tm_ratio)
 
         def save_result(key, method, n):
             est_data = method.impute()
             rW = W | (td.ori_W == False)
             eva = list(td.evaluate(est_data, rW))
             print(key, eva)
-            eva.append(method.exec_time)
+            eva.append(round(method.exec_time, 1))
             if key not in result:
                 df = pd.DataFrame(eva, columns=[n], index=eva_list)
                 result[key] = df
@@ -119,7 +120,7 @@ def compare_methods(ori_data, miss_type, number=8, p=0.7):
         method_index += 1
 
         print(result['HAI'].loc['RMSE'])
-        break
+        # break
 
     text_path = result_dir + 'compare_methods.txt'
     fw = open(text_path, 'w')
@@ -141,7 +142,7 @@ def compare_methods(ori_data, miss_type, number=8, p=0.7):
         Yticks[eva] = obtain_ticks(Ylims[eva][0], Ylims[eva][1], Yminor[eva])
 
     for eva in eva_list:
-        img_path = result_dir + 'compare_methods_' + miss_type + '_' + eva + '.png'
+        img_path = result_dir + 'compare_methods_' + miss_type + '_' + eva + '.pdf'
 
         ax = plt.subplot()
         ax.set_xlabel('Missing Rate (%)')
@@ -150,6 +151,8 @@ def compare_methods(ori_data, miss_type, number=8, p=0.7):
         ax.set_ylim(Ylims[eva])
 
         ax.set_yticks(Yticks[eva])
+        ax.yaxis.grid(True, linestyle='--')
+        ax.xaxis.grid(True, linestyle='--')
 
         fw.write(eva + ':\n')
         nl = 0
@@ -163,9 +166,10 @@ def compare_methods(ori_data, miss_type, number=8, p=0.7):
             fw.write(','.join(list(map(str, result[method].loc[eva]))) + '\n')
             nl += 1
         plt.legend(loc='best')
-        plt.savefig(img_path, format='png')
+        plt.savefig(img_path, format='pdf')
         plt.close()
     fw.close()
+    print(miss_list)
     return
 
 
@@ -210,7 +214,7 @@ def compare_C(ori_data, miss_ratio, miss_type, p=0.7):
         Yticks[eva] = obtain_ticks(Ylims[eva][0], Ylims[eva][1], Yminor[eva])
 
     for eva in eva_list:
-        img_path = result_dir + 'compare_C_' + miss_type + '_' + eva + '.svg'
+        img_path = result_dir + 'compare_C_' + miss_type + '_' + eva + '.pdf'
         ax = plt.subplot()
         ax.set_xlabel(Xlabel)
         ax.set_ylabel(eva + ' (' + metric_dict[eva] + ')')
@@ -219,7 +223,7 @@ def compare_C(ori_data, miss_ratio, miss_type, p=0.7):
 
         ax.plot(C_list, df[eva], color='r', marker='o')
         ax.legend(loc='best')
-        plt.savefig(img_path)
+        plt.savefig(img_path, format='pdf')
         plt.close()
 
         fw.write(eva + ':\n')
@@ -233,4 +237,4 @@ if __name__ == "__main__":
 
     init()
     ori_data = scio.loadmat(ori_path)['tensor']
-    compare_methods(ori_data, RAND_MISS, number=2)
+    compare_methods(ori_data, RAND_MISS, number=8)
