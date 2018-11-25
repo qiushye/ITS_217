@@ -36,6 +36,11 @@ class roadmap:
         self.start_ids = start_ids
         self.end_ids = end_ids
         self.seeds = set()
+        self.est_levels = dict()
+        self.known = dict()
+        for r in roads:
+            self.est_levels[r] = 3
+            self.known[r] = False
 
         for r in roads:
             rs = road(data_dir + r + '.csv')
@@ -87,9 +92,12 @@ class roadmap:
                 # 邻居路段第二类：以参考路段的起点作为终点
                 if r in start_ids[end_id]:  # 去掉相向路段
                     continue
-                if self.corr(id, r, time_period, rate) > corr_thre:
+                corr_rate = self.corr(id, r, time_period, rate)
+                edge = r + '-' + id
+
+                if corr_rate > corr_thre:
                     A1.add(r)
-                    E1.add(r + '-' + id)
+                    E1.add(edge)
         except:
             pass
 
@@ -117,6 +125,8 @@ class roadmap:
 
         rs.W = dict()
         for e in rs.UE:
+            # r1, r2 = e.split('-')
+            # rs.W[e] = self.corr(r1, r2, time_period, rate)
             rs.W[e] = random()
 
         self.road_info[id] = rs
@@ -214,10 +224,11 @@ class roadmap:
 
             else:
                 for s in UnS:
-                    seed_temp_rs = self.road_info[s]
-                    temp_diff = seed_temp_rs.V_diff[time_period][date]
-                    if s + '-' + r in rs.W:
-                        temp_sde += rs.W[s + '-' + r] * temp_diff
+                    e2 = s + '-' + r
+                    if e2 in rs.W:
+                        seed_temp_rs = self.road_info[s]
+                        temp_diff = seed_temp_rs.V_diff[time_period][date]
+                        temp_sde += rs.W[e2] * temp_diff
 
             sde += temp_sde * rs.W[r + '-' + id]
 
@@ -247,10 +258,18 @@ class roadmap:
                     for i in range(indice):
                         date = indexes[i]
                         v_diff = rs.V_diff[time_period][date]
-                        other_v_diff = self.speed_diff_est(
-                            other_road, date, time_period)
+                        other_v_diff = 0
+                        for s in rs.UN & self.seeds:
+                            e2 = s + '-' + other_road
+                            if e2 in rs.W:
+                                seed_temp_rs = self.road_info[s]
+                                temp_diff = seed_temp_rs.V_diff[time_period][
+                                    date]
+                                other_v_diff += rs.W[e2] * temp_diff
+                        # other_v_diff = self.speed_diff_est(
+                        #     other_road, date, time_period)
                         temp1 += (diff_pre[i] - v_diff) * \
-                            other_v_diff + lam * rs.W[edge]
+                            other_v_diff #+ lam * rs.W[edge]
                     # print(edge, temp1)
                     rs.W[edge] -= alpha * temp1 / indice
 
@@ -271,7 +290,7 @@ class roadmap:
                         v_diff = rs.V_diff[time_period][date]
                         seed_v_diff = seed_info.V_diff[time_period][date]
                         temp2 += (diff_pre[i] - v_diff) * \
-                            rs.W[e] * seed_v_diff + lam * rs.W[edge]
+                            rs.W[e] * seed_v_diff #+ lam * rs.W[edge]
                     # print(edge, temp2)
                     rs.W[edge] -= alpha * temp2 / indice
             self.road_info[id] = rs
@@ -282,14 +301,17 @@ class roadmap:
                 diff.append(self.speed_diff_est(id, date, time_period))
             # mean = sum(diff) / indice
             diff_arr = np.array(diff)
-            abs_diff = np.linalg.norm((diff_arr - pre_diff_arr))
-            # print('diff_norm', abs_diff)
+            abs_diff = abs(diff_arr - pre_diff_arr).sum()
+            print(diff_arr, pre_diff_arr)
+            print('diff_norm', abs_diff)
+            # print(np.linalg.norm(pre_diff_arr))
             if abs_diff < threshold:
+                # if abs_diff < threshold:
                 break
             iter += 1
             # break
         self.road_info[id] = rs
-        print('iter:', iter)
+        print('iter:', iter, abs_diff / np.linalg.norm(pre_diff_arr))
         return
 
     def online_est(self, id, date, time_period, rate):

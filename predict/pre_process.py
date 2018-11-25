@@ -9,7 +9,7 @@ created by qiushye on 2018.11.12
 python version >= 3
 """
 import sys
-sys.path.append('..')
+sys.path.append('.')
 from impute.compt.halrtc_csp import HaLRTC_CSP
 
 cur_dir = os.path.split(os.path.realpath(__file__))[0]
@@ -124,12 +124,12 @@ if __name__ == '__main__':
 
     train_rate = 0.7
     time_period = '19'
-    threshold = 0.001
+    threshold = 1e-4
     lam = 0.1
     alpha = 0.05
     corr_thre = 0.7
     sup_rate = 0.5
-    seed_rate = 0.2
+    seed_rate = 0.3
     K = int(seed_rate * len(RN.roads))
 
     for id in RN.roads:
@@ -137,22 +137,39 @@ if __name__ == '__main__':
 
     ori_RN = copy.deepcopy(RN)
 
-    id = '40'
-    date = '2012-11-17'
+    id = '63'
+    date = '2012-11-15'
     rs = RN.road_info[id]
-    # for i in rs.UN:
-    #     print(i, RN.road_info[i].V_diff[time_period][date])
+    # print(rs.start_id, rs.end_id)
+    # print(rs.UE)
+    corr_array = np.zeros((len(RN.roads), len(RN.roads)))
+    df = pd.DataFrame(
+        corr_array, index=RN.roads.keys(), columns=RN.roads.keys())
+    corr_count = 0
+    total_count = 0
+    for i in RN.roads:
+        rs = RN.road_info[i]
+        if rs.start_id in RN.end_ids:
+            total_count += len(RN.end_ids[rs.start_id])
+        for edge in rs.UE:
+            s, e = edge.split('-')
+            if RN.corr(s, e, time_period, train_rate) > threshold:
+                corr_count += 1
+    print(corr_count/total_count)
+    
+    for i in rs.UN:
+        print(i, RN.road_info[i].V_diff[time_period][date])
 
-    # print(RN.corr(id, '50', time_period, train_rate))
-    # RN.seed_select(K, sup_rate, time_period, train_rate, corr_thre)
-    # print(RN.seeds)
-
+    RN.seed_select(K, sup_rate, time_period, train_rate, corr_thre)
+    print(RN.seeds)
+    sys.exit()
     roads = list(RN.roads.keys())
     roads.sort(
         key=lambda l: len(RN.road_info[l].A1 & RN.seeds)* 2 + \
         len(RN.road_info[l].A2 & RN.seeds), reverse = True
     )
     print(roads)
+    '''
     trend_same = 0
     predict_num = len(roads) - len(RN.seeds)
     MRE = 0
@@ -179,12 +196,16 @@ if __name__ == '__main__':
     print(time_period + 'h', MRE / predict_num)
     print('相同趋势:', trend_same / len(roads))
     sys.exit()
+    '''
     print(
         RN.trend_infer(id, date, time_period, train_rate),
         rs.delta_V[time_period][date])
 
-    print(RN.road_info[id].W)
+    print(RN.road_info[id].UE)
     RN.weight_learn(id, train_rate, time_period, threshold, lam, alpha)
     print(RN.road_info[id].W)
-    print('speed_diff', RN.speed_diff_est(id, date, time_period),
-          rs.V_diff[time_period][date])
+    est_diff, ori_diff = 0, 0
+    for date in dates[:10]:
+        est_diff += (RN.speed_diff_est(id, date, time_period) -
+                     rs.V_diff[time_period][date])**2
+    print(math.sqrt(est_diff / 10), ori_diff)

@@ -69,7 +69,7 @@ class STD(imputation):
                 core_pre + self.alpha * core_temp
             X = self.restruct(core, U_list)
             F_diff = np.linalg.norm(X - X_pre)
-            print('STD:', F_diff)
+            # print('STD:', F_diff)
             if abs(F_diff - F_diff_pre) < self.threshold:
                 break
 
