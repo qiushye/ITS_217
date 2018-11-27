@@ -39,4 +39,5 @@ class road:
         self.A2 = set()  # 2-hop邻居
         self.UN = set()
         self.UE = set()  # 所有连接的边
-        self.W = None
+        self.W = dict()
+        self.correlations = dict()
