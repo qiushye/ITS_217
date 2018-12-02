@@ -4,8 +4,8 @@ python version >= 3
 """
 
 import scipy.io as scio
-from process.traffic_data import traffic_data
-from compt.Imputation import imputation
+from compt.traffic_data import traffic_data
+from compt.imputation import imputation
 from compt.bpca_cpt import BPCA_CPT
 from compt.halrtc import HaLRTC
 from compt.halrtc_csp import HaLRTC_CSP
@@ -216,8 +216,8 @@ def compare_C(ori_data, miss_ratio, miss_type, p=0.7):
     fw.close()
     return
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    init()
-    ori_data = scio.loadmat(ori_path)['tensor']
-    compare_methods(ori_data, RAND_MISS)
+#     init()
+#     ori_data = scio.loadmat(ori_path)['tensor']
+#     compare_methods(ori_data, RAND_MISS)

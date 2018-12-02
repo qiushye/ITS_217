@@ -1,3 +1,4 @@
+# -*- coding: UTF-8 -*-
 import math
 import os
 import numpy as np
@@ -97,15 +98,16 @@ def complete(raw_dir, interval, data_dir):
             fw.write(dates[j] + ',')
             fw.write(','.join([str(speed) for speed in speed_arr[j]]) + '\n')
         fw.close()
+    return 
 
 
 if __name__ == '__main__':
     if not os.path.exists(data_dir):
         os.mkdir(data_dir)
 
-    raw_dir = 'D:/启东数据/启东流量数据/'
+    # raw_dir = 'D:/启东数据/启东流量数据/'
     interval = 60
-    complete(raw_dir, interval, data_dir)
+    # complete(raw_dir, interval, data_dir)
     roads_path = data_dir + 'road_map.txt'
     RN = road_network.roadmap(roads_path, data_dir)
 
@@ -123,7 +125,7 @@ if __name__ == '__main__':
         RN.get_info(id, data_dir, time_period, train_rate, corr_thre)
 
     id = '19'
-    date = '2012-11-14'
+    date = '2012-11-17'
 
     print(RN.road_info['19'].UN)
     # print(RN.cov_sup(sup_rate, {'19'}))
@@ -131,3 +133,4 @@ if __name__ == '__main__':
     print(RN.seeds)
     print(RN.speed_diff_est(id, date, time_period))
     RN.weight_learn(id, train_rate, time_period, threshold, lam, alpha)
+    RN.online_est(id, date, time_period, train_rate)

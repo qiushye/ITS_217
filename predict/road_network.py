@@ -1,3 +1,4 @@
+# -*- coding: UTF-8 -*-
 """
 created by qiushye on 2018.11.7
 python version >= 3
@@ -293,7 +294,7 @@ class roadmap:
             indice += 1
 
         v_mean = np.mean(rs.V[time_period][:indice + 1].values)
-        if len(rs.UnS) == 0:
+        if len(rs.UN&self.seeds) == 0:
             return v_mean
 
         delta_v = self.trend_infer(rs, date, time_period, rate)
