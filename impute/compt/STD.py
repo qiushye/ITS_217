@@ -6,15 +6,21 @@ python version >= 3
 import numpy as np
 import time
 import sys
-from .Imputation import imputation
+from .imputation import imputation
 from sktensor import tucker
 from .truncated_svd import truncator
 from sktensor.dtensor import dtensor
 
 
 class STD(imputation):
-
-    def __init__(self, miss_data, W, rank_list, alpha, lam, threshold, max_iter=500):
+    def __init__(self,
+                 miss_data,
+                 W,
+                 rank_list,
+                 alpha,
+                 lam,
+                 threshold,
+                 max_iter=500):
         if len(rank_list) != 3:
             raise RuntimeError('input rank_list error')
 
@@ -63,9 +69,10 @@ class STD(imputation):
                 core_pre + self.alpha * core_temp
             X = self.restruct(core, U_list)
             F_diff = np.linalg.norm(X - X_pre)
-            if abs(F_diff-F_diff_pre) > self.threshold:
+            # print('STD:', F_diff)
+            if abs(F_diff - F_diff_pre) < self.threshold:
                 break
-            print('STD:', F_diff)
+
             iter += 1
         time_e = time.time()
         self.exec_time = time_e - time_s

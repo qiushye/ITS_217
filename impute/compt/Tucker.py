@@ -3,7 +3,7 @@ created by qiushye on 2018.10.22
 python version >= 3
 """
 
-from Imputation import imputation
+from imputation import imputation
 from sktensor import tucker, cp
 import numpy as np
 import time
@@ -11,7 +11,6 @@ from sktensor.dtensor import dtensor
 
 
 class tucker_cpt(imputation):
-
     def __init__(self, miss_data, W, rank_list, threshold, max_iter=100):
         if len(rank_list) != 3:
             raise RuntimeError('input rank_list error')
@@ -25,6 +24,6 @@ class tucker_cpt(imputation):
         SD = dtensor(est_data)
         core1, U1 = tucker.hooi(SD, self.ranks, init='nvecs')
         ttm_data = core1.ttm(U1[0], 0).ttm(U1[1], 1).ttm(U1[2], 2)
-        self.est_data = self.W*est_data+(self.W == False)*ttm_data
+        self.est_data = self.W * est_data + (self.W == False) * ttm_data
         time_e = time.time()
-        self.exec_time = time_e-time_s
+        self.exec_time = time_e - time_s

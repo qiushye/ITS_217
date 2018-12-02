@@ -37,6 +37,11 @@ class roadmap:
         self.start_ids = start_ids
         self.end_ids = end_ids
         self.seeds = set()
+        self.est_levels = dict()
+        self.known = dict()
+        for r in roads:
+            self.est_levels[r] = 3
+            self.known[r] = False
 
         for r in roads:
             rs = road(data_dir + r + '.csv')
@@ -88,9 +93,12 @@ class roadmap:
                 # 邻居路段第二类：以参考路段的起点作为终点
                 if r in start_ids[end_id]:  # 去掉相向路段
                     continue
-                if self.corr(id, r, time_period, rate) > corr_thre:
+                corr_rate = self.corr(id, r, time_period, rate)
+                edge = r + '-' + id
+
+                if corr_rate > corr_thre:
                     A1.add(r)
-                    E1.add(r + '-' + id)
+                    E1.add(edge)
         except:
             pass
 
@@ -118,6 +126,8 @@ class roadmap:
 
         rs.W = dict()
         for e in rs.UE:
+            # r1, r2 = e.split('-')
+            # rs.W[e] = self.corr(r1, r2, time_period, rate)
             rs.W[e] = random()
 
         self.road_info[id] = rs
@@ -134,9 +144,13 @@ class roadmap:
                     continue
                 rs = self.road_info[r]
                 if s in rs.UN:
-                    res += len(rs.UN & seed) * sup_rate
                     cov_set.add(r)
         res += len(cov_set)
+        if len(cov_set & seed) > 0:
+            print('error')
+        for cs in cov_set:
+            rs = self.road_info[cs]
+            res += len(rs.UN & seed) * sup_rate
 
         return res
 
@@ -153,15 +167,18 @@ class roadmap:
                 cov_sup_next = self.cov_sup(sup_rate, seed | set([r]))
                 cur_rise = cov_sup_next - cov_sup_pre
                 # print(cov_sup_next, cov_sup_pre)
+
                 if cur_rise > max_rise:
                     max_rise = cur_rise
                     next_seed = r
+                    # print(r, cur_rise)
             seed.add(next_seed)
             # break
         self.seeds = seed
         return seed
 
-    def trend_infer(self, rs, date, time_period, rate):
+    def trend_infer(self, id, date, time_period, rate):
+        rs = self.road_info[id]
         seed = self.seeds
         p_max = 0
         delta_v_max = -1
@@ -188,7 +205,8 @@ class roadmap:
                 if delta_v_dict[sid] == delta_v_dict[eid]:
                     p += math.log10(self.corr(sid, eid, time_period, rate))
                 else:
-                    p += math.log10(1 - self.corr(sid, eid, time_period, rate))
+                    p += math.log10(
+                        1 - min(self.corr(sid, eid, time_period, rate), 0.999))
 
             if p > p_max:
                 p_max = p
@@ -207,11 +225,11 @@ class roadmap:
 
             else:
                 for s in UnS:
-                    seed_temp_rs = self.road_info[s]
-                    temp_diff = seed_temp_rs.V_diff[time_period][date]
-                    print('v_diff', temp_diff)
-                    if s + '-' + r in rs.W:
-                        temp_sde += rs.W[s + '-' + r] * temp_diff
+                    e2 = s + '-' + r
+                    if e2 in rs.W:
+                        seed_temp_rs = self.road_info[s]
+                        temp_diff = seed_temp_rs.V_diff[time_period][date]
+                        temp_sde += rs.W[e2] * temp_diff
 
             sde += temp_sde * rs.W[r + '-' + id]
 
@@ -222,15 +240,16 @@ class roadmap:
         seed = self.seeds
         rs = self.road_info[id]
         indexes = rs.V.index
-
+        iter = 0
         while True:
             indice = 0
             diff_pre = []
-            while indice / len(indexes) < rate:
+            while (indice + 1) / len(indexes) < rate:
                 date = indexes[indice]
                 diff_pre.append(self.speed_diff_est(id, date, time_period))
                 indice += 1
-            mean_pre = sum(diff_pre) / indice
+            # mean_pre = sum(diff_pre) / indice
+            pre_diff_arr = np.array(diff_pre)
 
             for edge in rs.W:
                 temp1 = 0
@@ -240,14 +259,23 @@ class roadmap:
                     for i in range(indice):
                         date = indexes[i]
                         v_diff = rs.V_diff[time_period][date]
-                        other_v_diff = self.speed_diff_est(
-                            other_road, date, time_period)
-                        print(other_v_diff)
+                        other_v_diff = 0
+                        for s in rs.UN & self.seeds:
+                            e2 = s + '-' + other_road
+                            if e2 in rs.W:
+                                seed_temp_rs = self.road_info[s]
+                                temp_diff = seed_temp_rs.V_diff[time_period][
+                                    date]
+                                other_v_diff += rs.W[e2] * temp_diff
+                        # other_v_diff = self.speed_diff_est(
+                        #     other_road, date, time_period)
                         temp1 += (diff_pre[i] - v_diff) * \
-                            other_v_diff + lam * rs.W[edge]
-
+                            other_v_diff #+ lam * rs.W[edge]
+                    # print(edge, temp1)
                     rs.W[edge] -= alpha * temp1 / indice
-                    print(other_road, temp1, rs.W[edge])
+
+            self.road_info[id] = rs
+            rs = self.road_info[id]
 
             for edge in rs.W:
                 temp2 = 0
@@ -255,49 +283,50 @@ class roadmap:
                 if r2 in seed:
                     continue
                 if id not in edge and r1 in seed:
-                    if r2 in rs.A1:
-                        continue
                     seed_info = self.road_info[r1]
                     if r2 + '-' + id in rs.UE:  # 找出A1与中心的edge
                         e = r2 + '-' + id
-                    else:
-                        print(edge, r2, rs.A1, rs.UE)
                     for i in range(indice):
                         date = indexes[i]
                         v_diff = rs.V_diff[time_period][date]
                         seed_v_diff = seed_info.V_diff[time_period][date]
                         temp2 += (diff_pre[i] - v_diff) * \
-                            rs.W[e] * seed_v_diff + lam * rs.W[edge]
-
+                            rs.W[e] * seed_v_diff #+ lam * rs.W[edge]
+                    # print(edge, temp2)
                     rs.W[edge] -= alpha * temp2 / indice
+            self.road_info[id] = rs
 
             diff = []
             for i in range(indice):
                 date = indexes[i]
                 diff.append(self.speed_diff_est(id, date, time_period))
-            mean = sum(diff) / indice
-            abs_diff = abs(mean - mean_pre)
-
+            # mean = sum(diff) / indice
+            diff_arr = np.array(diff)
+            abs_diff = abs(diff_arr - pre_diff_arr).sum()
+            print(diff_arr, pre_diff_arr)
+            print('diff_norm', abs_diff)
+            # print(np.linalg.norm(pre_diff_arr))
             if abs_diff < threshold:
+                # if abs_diff < threshold:
                 break
-            print(diff, diff_pre)
+            iter += 1
             # break
-
         self.road_info[id] = rs
+        print('iter:', iter, abs_diff / np.linalg.norm(pre_diff_arr))
         return
 
     def online_est(self, id, date, time_period, rate):
         rs = self.road_info[id]
         indexes = rs.V.index
         indice = 0
-        while indice / len(indexes) > rate:
+        while (indice + 1) / len(indexes) > rate:
             indice += 1
 
         v_mean = np.mean(rs.V[time_period][:indice + 1].values)
-        if len(rs.UN&self.seeds) == 0:
+        if len(rs.UN & self.seeds) == 0:
             return v_mean
 
-        delta_v = self.trend_infer(rs, date, time_period, rate)
+        delta_v = self.trend_infer(id, date, time_period, rate)
         v_diff_est = self.speed_diff_est(id, date, time_period)
         if delta_v > 0:
             v_est = v_mean + v_diff_est
