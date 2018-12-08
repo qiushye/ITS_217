@@ -93,7 +93,7 @@ class roadmap:
 
             for r in end_ids[start_id]:
                 # 邻居路段第二类：以参考路段的起点作为终点
-                if r in start_ids[end_id]:  # 去掉相向路段
+                if end_id in start_ids and r in start_ids[end_id]:  # 去掉相向路段
                     continue
                 edge = r + '-' + id
                 A1.add(r)
@@ -222,10 +222,10 @@ class roadmap:
             edge = r + '-' + id
             temp_rs = self.road_info[r]
             # temp_sde = 0
-            level = self.est_levels[r]
+            # level = self.est_levels[r]
 
-            temp_sde = temp_rs.V_diff[time_period][date] * (self.effect_rate**
-                                                            level)
+            temp_sde = temp_rs.V_diff[time_period][date] * self.effect_rate
+
             sde += temp_sde * rs.W[edge] * rs.correlations[edge]
 
         return sde
@@ -305,14 +305,10 @@ class roadmap:
         if len(rs.UN & self.seeds) == 0:
             return v_mean
 
-        delta_v = self.trend_infer(id, date, time_period, rate)
+        # delta_v = self.trend_infer(id, date, time_period, rate)
         v_diff_est = self.speed_diff_est(id, date, time_period)
-        print('diff_est', v_diff_est)
-        print('mean', v_mean)
-        # if delta_v > 0:
-        #     v_est = v_mean + v_diff_est
-        # else:
-        #     v_est = v_mean - v_diff_est
+        # print('diff_est', v_diff_est)
+        # print('mean', v_mean)
         v_est = v_mean + v_diff_est
 
-        return v_est
+        return v_diff_est, v_est

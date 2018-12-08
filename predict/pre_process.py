@@ -114,6 +114,128 @@ def complete(raw_dir, interval, data_dir):
     return W
 
 
+def list_level(RN, road):
+    levels = []
+    for tr in RN.road_info[road].A1:
+        levels.append(RN.est_levels[tr])
+    return levels
+
+
+def level_weight(RN, road):
+    w = 0
+    for l in list_level(RN, road):
+        w += 2**(-l)
+    return w
+
+
+def predict(RN, params):
+    train_rate = params['train_rate']
+    time_period = params['time_period']
+    test_date = params['test_date']
+    threshold = params['threshold']
+    # sup_rate = params['sup_rate']
+    alpha = params['alpha']
+    # seed_rate = params['seed_rate']
+
+    MRE = 0
+    count = 0
+    # 将无法构建模型的路段挑出
+    unknown_roads = [r for r in RN.roads if RN.known[r] == False]
+
+    indexes = RN.road_info[unknown_roads[0]].V.index
+    indice = 0
+    while indice / len(indexes) < train_rate:
+        indice += 1
+
+    for r in unknown_roads:
+        if len(RN.road_info[r].A1) == 0:
+            RN.est_levels[r] = 0
+            RN.known[r] = True
+            RN.road_info[r].V_diff[time_period][test_date] = 0
+            v_est = np.mean(RN.road_info[r].V[time_period].values[:indice])
+            v_ori = RN.road_info[r].V[time_period][test_date]
+
+            if len(str(v_ori)) <= 5:  # 确保源速度不是填充值
+                cur_MRE = abs(v_ori - v_est) / v_ori
+                MRE += cur_MRE
+                count += 1
+                print(r, cur_MRE)
+
+    roads = list(RN.roads.keys())
+    roads.sort(key=lambda l: len(RN.road_info[l].A1 & RN.seeds), reverse=True)
+
+    iter = 0
+    while True:
+        unknown_roads = [r for r in RN.roads if RN.known[r] == False]
+        if len(unknown_roads) == 0:
+            break
+
+        unknown_roads.sort(key=lambda x: level_weight(RN, x), reverse=True)
+        for road in unknown_roads:
+            if max(list_level(RN, road)) >= RN.max_level:
+                # print(road, list_level(road))
+                continue
+            RN.weight_learn(road, train_rate, time_period, threshold, alpha)
+            v_diff_est = RN.speed_diff_est(road, test_date, time_period)
+            RN.road_info[road].V_diff[time_period][test_date] = v_diff_est
+            RN.est_levels[road] = max(list_level(RN, road)) + 1
+            RN.known[road] = True
+
+            # delta_v = RN.trend_infer(road, test_date, time_period, train_rate)
+            v_mean = np.mean(RN.road_info[road].V[time_period].values[:indice])
+            v_est = v_mean + v_diff_est
+
+            v_ori = RN.road_info[road].V[time_period][test_date]
+            if len(str(v_ori)) <= 5:
+                cur_MRE = abs(v_ori - v_est) / v_ori
+                MRE += cur_MRE
+                print(road, cur_MRE)
+                count += 1
+            RN.road_info[road].V[time_period][test_date] = v_est
+
+        unknown_roads_temp = [r for r in RN.roads if RN.known[r] == False]
+        if len(unknown_roads_temp) == len(unknown_roads):
+            # 产生预测闭环
+            print('---', unknown_roads_temp, '---')
+            unknown_roads_temp.sort(
+                key=lambda x: sum(j < RN.max_level for j in RN.est_levels[x]),
+                reverse=True)
+            ur = unknown_roads[0]
+            temp_RN = copy.deepcopy(RN)
+            if len(temp_RN.road_info[ur].A1) > 0:
+                for ar in temp_RN.road_info[ur].A1:
+                    if temp_RN.est_levels[ar] >= temp_RN.max_level:
+                        temp_RN.road_info[ur].A1.remove(ar)
+                temp_RN.weight_learn(ur, train_rate, time_period, threshold,
+                                     alpha)
+                v_diff_est = temp_RN.speed_diff_est(ur, test_date, time_period)
+                RN.road_info[ur].V_diff[time_period][test_date] = v_diff_est
+                RN.est_levels[ur] = max(list_level(temp_RN, ur)) + 1
+                RN.known[ur] = True
+
+            else:
+                RN.est_levels[ur] = 0
+                RN.known[ur] = True
+                RN.road_info[ur].V_diff[time_period][test_date] = 0
+                v_est = np.mean(
+                    RN.road_info[ur].V[time_period].values[:indice])
+                v_ori = RN.road_info[ur].V[time_period][test_date]
+
+            if len(str(v_ori)) <= 5:
+
+                cur_MRE = abs(v_ori - v_est) / v_ori
+                MRE += cur_MRE
+                count += 1
+                print(ur, cur_MRE)
+            # break
+
+        iter += 1
+        if iter > 100:
+            break
+    print(iter, unknown_roads, count)
+    print(MRE / count)
+
+
 if __name__ == '__main__':
     init()
 
@@ -123,12 +245,13 @@ if __name__ == '__main__':
     roads_path = data_dir + 'road_map.txt'
     RN = road_network.roadmap(roads_path, data_dir)
 
-    train_rate = 0.7
-    time_period = '15'
+    train_rate = 0.8
+    time_period = '8'
     threshold = 1e-5
+    test_date = '2012-11-20'
     sup_rate = 1
     alpha = 1
-    corr_thre = 0.5
+    # corr_thre = 0.5
     seed_rate = 0.3
     K = int(seed_rate * len(RN.roads))
 
@@ -137,26 +260,23 @@ if __name__ == '__main__':
 
     ori_RN = copy.deepcopy(RN)
 
-    id = '63'
-    test_date = '2012-11-20'
-
-    # corr_count = 0
-    # total_count = 0
-    # for i in RN.roads:
-    #     rs = RN.road_info[i]
-    #     total_count += len(rs.UE)
-    #     for edge in rs.UE:
-    #         s, e = edge.split('-')
-    #         if RN.corr(s, e, time_period, train_rate) > corr_thre:
-    #             corr_count += 1
-    # print('corr_rate', corr_count / total_count)
-
     RN.seed_select(K, time_period, train_rate, sup_rate)
     print(sorted(list(RN.seeds)))
     for r in RN.seeds:
         RN.est_levels[r] = 0
         RN.known[r] = True
 
+    params = {
+        'train_rate': train_rate,
+        'time_period': time_period,
+        'threshold': threshold,
+        'alpha': alpha,
+        'test_date': test_date
+    }
+    predict(RN, params)
+    sys.exit()
+
+    id = '63'
     indexes = RN.road_info[id].V.index
     indice = 0
     while indice / len(indexes) < train_rate:
@@ -171,76 +291,19 @@ if __name__ == '__main__':
             RN.road_info[r].V_diff[time_period][test_date] = 0
             v_est = np.mean(RN.road_info[r].V[time_period].values[:indice])
             v_ori = RN.road_info[r].V[time_period][test_date]
+
             if len(str(v_ori)) <= 5:
-                MRE += abs(v_ori - v_est) / v_ori
+                cur_MRE = abs(v_ori - v_est) / v_ori
+                MRE += cur_MRE
                 count += 1
-    # sys.exit()
+                print(r, cur_MRE)
+
     roads = list(RN.roads.keys())
     roads.sort(key=lambda l: len(RN.road_info[l].A1 & RN.seeds), reverse=True)
-    print(roads)
+    print(RN.road_info['45'].A1)
+    print('------------------')
     id = roads[0]
 
-    def list_level(road):
-        levels = []
-        for tr in RN.road_info[road].A1:
-            levels.append(RN.est_levels[tr])
-        return levels
-
-    def level_weight(road):
-        w = 0
-        for l in list_level(road):
-            w += 2**(-l)
-        return w
-
-    iter = 0
-
-    while True:
-        unknown_roads = [r for r in RN.roads if RN.known[r] == False]
-        if len(unknown_roads) == 0:
-            break
-
-        unknown_roads.sort(key=lambda x: level_weight(x), reverse=True)
-        for road in unknown_roads:
-            if max(list_level(road)) >= RN.max_level:
-                print(road, list_level(road))
-                continue
-            RN.weight_learn(road, train_rate, time_period, threshold, alpha)
-            v_diff_est = RN.speed_diff_est(road, test_date, time_period)
-            RN.road_info[road].V_diff[time_period][test_date] = v_diff_est
-            RN.est_levels[road] = max(list_level(road)) + 1
-            RN.known[road] = True
-
-            # delta_v = RN.trend_infer(road, test_date, time_period, train_rate)
-            v_mean = np.mean(RN.road_info[road].V[time_period].values[:indice])
-            v_est = v_mean + v_diff_est
-
-            v_ori = RN.road_info[road].V[time_period][test_date]
-            if len(str(v_ori)) <= 5:
-                MRE += abs(v_ori - v_est) / v_ori
-                count += 1
-            RN.road_info[road].V[time_period][test_date] = v_est
-
-        unknown_roads_temp = [r for r in RN.roads if RN.known[r] == False]
-        if len(unknown_roads_temp) == len(unknown_roads):
-
-            # break
-            for ur in unknown_roads_temp:
-                if len(list_level(ur)) == 1:
-                    RN.est_levels[ur] = 0
-                    RN.known[ur] = True
-                    RN.road_info[ur].V_diff[time_period][test_date] = 0
-                    v_est = np.mean(
-                        RN.road_info[ur].V[time_period].values[:indice])
-                    v_ori = RN.road_info[ur].V[time_period][test_date]
-                    if len(str(v_ori)) <= 5:
-                        MRE += abs(v_ori - v_est) / v_ori
-                        count += 1
-                    break
-        iter += 1
-        if iter > 100:
-            break
-    print(iter, unknown_roads, count)
-    print(MRE / count)
     sys.exit()
     print(
         RN.trend_infer(id, test_date, time_period, train_rate),
