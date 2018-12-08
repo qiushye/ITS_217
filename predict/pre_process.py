@@ -18,8 +18,8 @@ result_dir = cur_dir + '/result/'
 
 dates = [
     '2012-11-07', '2012-11-08', '2012-11-09', '2012-11-10', '2012-11-11',
-    '2012-11-12', '2012-11-13', '2012-11-14', '2012-11-15', '2012-11-16',
-    '2012-11-17', '2012-11-18', '2012-11-19', '2012-11-20', '2012-11-21'
+    '2012-11-12', '2012-11-13', '2012-11-14', '2012-11-15', '2012-11-16'
+    #'2012-11-17', '2012-11-18', '2012-11-19', '2012-11-20', '2012-11-21'
 ]
 
 
@@ -142,7 +142,7 @@ def predict(RN, params):
     # 将无法构建模型的路段挑出
     unknown_roads = [r for r in RN.roads if RN.known[r] == False]
 
-    indexes = RN.road_info[unknown_roads[0]].V.index
+    indexes = RN.road_info[list(RN.roads.keys())[0]].V.index
     indice = 0
     while indice / len(indexes) < train_rate:
         indice += 1
@@ -159,7 +159,7 @@ def predict(RN, params):
                 cur_MRE = abs(v_ori - v_est) / v_ori
                 MRE += cur_MRE
                 count += 1
-                print(r, cur_MRE)
+                # print(r, cur_MRE)
 
     roads = list(RN.roads.keys())
     roads.sort(key=lambda l: len(RN.road_info[l].A1 & RN.seeds), reverse=True)
@@ -189,7 +189,7 @@ def predict(RN, params):
             if len(str(v_ori)) <= 5:
                 cur_MRE = abs(v_ori - v_est) / v_ori
                 MRE += cur_MRE
-                print(road, cur_MRE)
+                # print(road, cur_MRE)
                 count += 1
             RN.road_info[road].V[time_period][test_date] = v_est
 
@@ -226,14 +226,17 @@ def predict(RN, params):
                 cur_MRE = abs(v_ori - v_est) / v_ori
                 MRE += cur_MRE
                 count += 1
-                print(ur, cur_MRE)
+                # print(ur, cur_MRE)
             # break
 
         iter += 1
         if iter > 100:
             break
-    print(iter, unknown_roads, count)
-    print(MRE / count)
+    # print(iter, unknown_roads, count)
+    if count > 0:
+        print(time_period, MRE / count)
+    else:
+        print(time_period, 'no ori_data')
 
 
 if __name__ == '__main__':
@@ -245,35 +248,39 @@ if __name__ == '__main__':
     roads_path = data_dir + 'road_map.txt'
     RN = road_network.roadmap(roads_path, data_dir)
 
-    train_rate = 0.8
+    train_rate = 0.7
     time_period = '8'
     threshold = 1e-5
-    test_date = '2012-11-20'
+    test_date = '2012-11-14'
     sup_rate = 1
     alpha = 1
     # corr_thre = 0.5
     seed_rate = 0.3
     K = int(seed_rate * len(RN.roads))
+    for time_period in ['17', '19', '37', '39']:
+        for r in RN.roads:
+            RN.get_info(r, data_dir, time_period, train_rate)
 
-    for r in RN.roads:
-        RN.get_info(r, data_dir, time_period, train_rate)
+        ori_RN = copy.deepcopy(RN)
 
-    ori_RN = copy.deepcopy(RN)
+        RN.seed_select(K, time_period, train_rate, sup_rate)
+        # print(sorted(list(RN.seeds)))
+        for r in RN.seeds:
+            RN.est_levels[r] = 0
+            RN.known[r] = True
 
-    RN.seed_select(K, time_period, train_rate, sup_rate)
-    print(sorted(list(RN.seeds)))
-    for r in RN.seeds:
-        RN.est_levels[r] = 0
-        RN.known[r] = True
+        params = {
+            'train_rate': train_rate,
+            'time_period': time_period,
+            'threshold': threshold,
+            'alpha': alpha,
+            'test_date': test_date
+        }
 
-    params = {
-        'train_rate': train_rate,
-        'time_period': time_period,
-        'threshold': threshold,
-        'alpha': alpha,
-        'test_date': test_date
-    }
-    predict(RN, params)
+        predict(RN, params)
+        for r in RN.roads:
+            RN.est_levels[r] = RN.max_level
+            RN.known[r] = False
     sys.exit()
 
     id = '63'
