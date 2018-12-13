@@ -3,3 +3,4 @@ impute/data
 impute/result
 predict/data
 predict/result
+*/__pychche__

@@ -286,7 +286,6 @@ class roadmap:
                 break
 
             # if abs_diff < threshold:
-            #     # if abs_diff < threshold:
             #     break
             iter += 1
             # break
@@ -311,4 +310,4 @@ class roadmap:
         # print('mean', v_mean)
         v_est = v_mean + v_diff_est
 
-        return v_diff_est, v_est
+        return v_est
