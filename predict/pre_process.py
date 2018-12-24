@@ -1,3 +1,4 @@
+# -*- coding: UTF-8 -*-
 import math
 import os
 import numpy as np
@@ -13,6 +14,8 @@ python version >= 3
 import sys
 sys.path.append('.')
 from impute.compt.halrtc_csp import HaLRTC_CSP
+import matplotlib
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 from population import population
@@ -311,15 +314,15 @@ def mode_miss(data_dir, interval):
 
 if __name__ == '__main__':
 
-    raw_dir = 'D:/启东数据/启东流量数据/'
+    raw_dir = '/home/qiushye/启东流量数据/'
     roads_path = data_dir + 'road_map.txt'
     interval = 30
     result_dir = result_dir + str(interval) + 'min/'
     init()
     unseed_path = result_dir + 'unseed_roads.txt'
-    # complete(roads_path, raw_dir, interval, data_dir)
+    complete(roads_path, raw_dir, interval, data_dir)
     # mode_miss(data_dir, interval)
-    road_analyse(raw_dir, ['8', '20'], roads_path)
+    # road_analyse(raw_dir, ['8', '20'], roads_path)
 
     # var_assign(unseed_path, interval)
     sys.exit()

@@ -4,3 +4,4 @@ impute/result
 predict/data
 predict/result
 */__pychche__
+*.pyc

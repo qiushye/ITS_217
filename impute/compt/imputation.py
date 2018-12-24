@@ -1,3 +1,4 @@
+# -*- coding= UTF-8 -*-
 """
 created by qiushye on 2018.10.22
 python version >= 3
