@@ -140,8 +140,13 @@ def compare(interval, train_end, test_start, params):
 
 
 def roads_result(interval, train_end, test_start, params):
+    res_dir = result_dir + 'methods_compare/'
+    if not os.path.exists(res_dir):
+        os.mkdir(res_dir)
+
     time_period = params['time_period']
-    marker = ['o', '*', '_', '^']
+    markers = ['o', '*', 'D', '^']
+    colors = ['r', 'b', 'y', 'g']
 
     predict_res, un_seeds = compare(interval, train_end, test_start, params)
     ax = plt.subplot()
@@ -150,6 +155,8 @@ def roads_result(interval, train_end, test_start, params):
     ax.yaxis.grid(True, linestyle='--')
     ax.xaxis.grid(True, linestyle='--')
     k = 0
+    fw = open(res_dir + time_period + '_roads_mre.csv', 'w')
+    fw.write(',' + ','.join(un_seeds) + '\n')
     for method in predict_res:
         if method == 'ori':
             continue
@@ -157,17 +164,80 @@ def roads_result(interval, train_end, test_start, params):
         mre_arr = abs(predict_res[method] -
                       predict_res['ori']) / predict_res['ori']
         print(method, mre_arr.shape)
+        fw.write(method + ',')
+        fw.write(','.join([str(round(mre, 3)) for mre in mre_arr]) + '\n')
         ax.plot(
             range(len(un_seeds)),
             mre_arr,
             label='$' + method + '$',
-            linestyle=marker[k],
-            color='red')
+            marker=markers[k],
+            linestyle='--',
+            color=colors[k])
         k += 1
+
+    fw.close()
     plt.legend(loc='best')
-    plt.savefig(result_dir + time_period + '_methods_roads_MRE.png')
+    plt.savefig(res_dir + time_period + '_methods_roads_MRE.png')
     plt.close()
     return
+
+
+def periods_compare(interval, params, train_end, test_start):
+
+    periods_result = {}
+    periods = 24 * 60 // interval
+    methods = []
+    for period in periods:
+        params['time_period'] = period
+        predict_res, un_seeds = compare(interval, train_end, test_start,
+                                        params)
+        for method in predict_res:
+            if method not in periods_result:
+                methods.append(method)
+                periods_result[method] = []
+            periods_result[method].append(predict_res[method])
+
+    ori_df = pd.DataFrame(
+        periods_result['ori'], index=range(periods), columns=un_seeds)
+    mre_result = {}
+    rmse_result = {}
+    mae_result = {}
+    for method in methods:
+        if method == 'ori':
+            continue
+        df = pd.DataFrame(
+            periods_result[method], index=range(periods), columns=un_seeds)
+        mae_result[method] = abs(df - ori_df)
+        mre_result[method] = mae_result[method] / ori_df
+        rmse_result[method] = (df - ori_df)**2
+
+    markers = ['o', '*', 'D', '^']
+    colors = ['r', 'b', 'y', 'g']
+
+    ax = plt.subplot()
+    ax.set_xlabel("roads_order")
+    ax.set_ylabel('MRE')
+    ax.yaxis.grid(True, linestyle='--')
+    ax.xaxis.grid(True, linestyle='--')
+    k = 0
+    # fw = open(result_dir +  + 'roads_mre.csv', 'w')
+    # fw.write(',' + ','.join(un_seeds) + '\n')
+    for method in methods:
+        if method == 'ori':
+            continue
+        mre_arr = np.mean(mre_result.values, ax=1)
+        ax.plot(
+            range(len(un_seeds)),
+            mre_arr,
+            label='$' + method + '$',
+            marker=markers[k],
+            linestyle='--',
+            color=colors[k])
+        k += 1
+
+    plt.legend(loc='best')
+    plt.savefig(result_dir + 'roads_mre.png')
+    plt.close()
 
 
 if __name__ == '__main__':
