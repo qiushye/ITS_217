@@ -1,3 +1,4 @@
+import time
 from init import dates, cur_dir, data_dir, result_dir
 import numpy as np
 import pandas as pd
@@ -155,7 +156,9 @@ def roads_result(interval, train_end, test_start, params):
     ax.yaxis.grid(True, linestyle='--')
     ax.xaxis.grid(True, linestyle='--')
     k = 0
-    fw = open(res_dir + time_period + '_roads_mre.csv', 'w')
+    fw = open(
+        res_dir + str(test_start) + 'day_' + time_period + '_roads_mre.csv',
+        'w')
     fw.write(',' + ','.join(un_seeds) + '\n')
     for method in predict_res:
         if method == 'ori':
@@ -171,26 +174,30 @@ def roads_result(interval, train_end, test_start, params):
             mre_arr,
             label='$' + method + '$',
             marker=markers[k],
-            linestyle='--',
+            linestyle='-',
             color=colors[k])
         k += 1
 
     fw.close()
     plt.legend(loc='best')
-    plt.savefig(res_dir + time_period + '_methods_roads_MRE.png')
+    plt.savefig(res_dir + str(test_start) + 'day_' + time_period +
+                '_methods_roads_MRE.png')
     plt.close()
     return
 
 
-def periods_compare(interval, params, train_end, test_start):
+def periods_compare(interval, train_end, test_start, params):
 
     periods_result = {}
     periods = 24 * 60 // interval
     methods = []
-    for period in periods:
-        params['time_period'] = period
+    for period in range(periods):
+        params['time_period'] = str(period)
+        time_s = time.time()
         predict_res, un_seeds = compare(interval, train_end, test_start,
                                         params)
+        time_e = time.time()
+        print(period, str(time_e - time_s) + 's')
         for method in predict_res:
             if method not in periods_result:
                 methods.append(method)
@@ -199,6 +206,7 @@ def periods_compare(interval, params, train_end, test_start):
 
     ori_df = pd.DataFrame(
         periods_result['ori'], index=range(periods), columns=un_seeds)
+    ori_df.to_csv(result_dir + test_start + 'day_ori_predict.csv', sep=',')
     mre_result = {}
     rmse_result = {}
     mae_result = {}
@@ -207,6 +215,9 @@ def periods_compare(interval, params, train_end, test_start):
             continue
         df = pd.DataFrame(
             periods_result[method], index=range(periods), columns=un_seeds)
+        df.to_csv(
+            result_dir + test_start + 'day_' + method + '_predict.csv',
+            sep=',')
         mae_result[method] = abs(df - ori_df)
         mre_result[method] = mae_result[method] / ori_df
         rmse_result[method] = (df - ori_df)**2
@@ -220,24 +231,29 @@ def periods_compare(interval, params, train_end, test_start):
     ax.yaxis.grid(True, linestyle='--')
     ax.xaxis.grid(True, linestyle='--')
     k = 0
-    # fw = open(result_dir +  + 'roads_mre.csv', 'w')
-    # fw.write(',' + ','.join(un_seeds) + '\n')
+    fw = open(result_dir + 'roads_mre.csv', 'w')
+    fw.write(',' + ','.join(un_seeds) + '\n')
     for method in methods:
         if method == 'ori':
             continue
-        mre_arr = np.mean(mre_result.values, ax=1)
+        fw.write(method + ',')
+        mre_arr = np.mean(mre_result.values, axis=0)
+        fw.write(','.join([str(round(v, 3)) for v in mre_arr]) + '\n')
         ax.plot(
             range(len(un_seeds)),
             mre_arr,
             label='$' + method + '$',
             marker=markers[k],
-            linestyle='--',
+            linestyle='-',
             color=colors[k])
         k += 1
 
+    fw.close()
     plt.legend(loc='best')
     plt.savefig(result_dir + 'roads_mre.png')
     plt.close()
+
+    return
 
 
 if __name__ == '__main__':
@@ -246,7 +262,7 @@ if __name__ == '__main__':
     interval = 30
 
     train_rate = (train_end - 1) / len(dates)
-    time_period = '15'
+    time_period = '30'
     threshold = 1e-5
     test_date = dates[test_start]
     sup_rate = 1
@@ -262,4 +278,4 @@ if __name__ == '__main__':
         'seed_rate': seed_rate
     }
 
-    roads_result(interval, train_end, test_start, params)
+    periods_compare(interval, train_end, test_start, params)
