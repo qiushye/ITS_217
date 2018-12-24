@@ -17,15 +17,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from population import population
 
-cur_dir = os.path.split(os.path.realpath(__file__))[0]
-data_dir = cur_dir + '/data/'
-result_dir = cur_dir + '/result/'
-
-dates = [
-    '2012-11-07', '2012-11-08', '2012-11-09', '2012-11-10', '2012-11-11',
-    '2012-11-12', '2012-11-13', '2012-11-14', '2012-11-15', '2012-11-16',
-    '2012-11-17', '2012-11-18', '2012-11-19', '2012-11-20', '2012-11-21'
-]
+from init import dates, cur_dir, data_dir, result_dir
 
 
 def init():
@@ -68,11 +60,11 @@ def speed_assign(file_path):
 
 
 def road_analyse(raw_dir, all_roads, roads_path):
-    all_roads = []
-    with open(roads_path, 'r') as f:
-        for line in f:
-            row = line.strip().split(',')
-            all_roads.append(row[0])
+    # all_roads = []
+    # with open(roads_path, 'r') as f:
+    #     for line in f:
+    #         row = line.strip().split(',')
+    #         all_roads.append(row[0])
 
     v_array = np.zeros((11, len(dates)))
     for file in os.listdir(raw_dir):
@@ -83,36 +75,53 @@ def road_analyse(raw_dir, all_roads, roads_path):
             continue
         v_array += speed_assign(raw_dir + file)
 
-    ax = plt.subplot()
-    sns.heatmap(v_array, cmap='RdBu', linewidths=0.05)
-    ax.invert_yaxis()
-    # ax.set_xlim([0, 14])
-    # ax.set_ylim([0, 10])
-    ax.set_xlabel('dates')
-    ax.set_ylabel('speed level(degree=10km/h)')
-    plt.savefig(result_dir + 'all_roads_dates_speed.png')
-    plt.close()
+        ax = plt.subplot()
+        sns.heatmap(v_array, cmap='RdBu', linewidths=0.05)
+        ax.invert_yaxis()
+        # ax.set_xlim([0, 14])
+        # ax.set_ylim([0, 10])
+        ax.set_xlabel('dates')
+        ax.set_ylabel('speed level(degree=10km/h)')
+        plt.savefig(result_dir + id + '_dates_speed.png', bbox_inches='tight')
+        plt.close()
     return
 
 
-def var_assign(interval):
-    road_data = []
+def var_assign(unseed_path, interval):
+    uns_roads = []
+    with open(unseed_path, 'r') as f:
+        uns_roads = f.readline().strip().split(',')
     files_dir = data_dir + str(interval) + '_impute/'
-    for file in os.listdir(files_dir):
+    road_data = []
+    for r in uns_roads:
+        file = r + '.csv'
         df = pd.read_csv(files_dir + file, index_col=0)
         arr = df.values
         road_data.append(arr)
 
     speed_tensor = np.array(road_data)
-    var_matrix = np.zeros_like(speed_tensor[:, 0, :])
+    var_matrix = np.zeros((speed_tensor.shape[2], len(uns_roads)))
     sp = var_matrix.shape
+    print('shape:', sp)
+    fw = open(result_dir + 'var_assign.csv', 'w')
+    fw.write(',' + ','.join(uns_roads) + '\n')
     for i in range(sp[0]):
+        fw.write(str(i))
         for j in range(sp[1]):
-            var_matrix[i, j] = np.var(speed_tensor[i, :, j])
+            var_matrix[i, j] = round(np.var(speed_tensor[j, :, i]))
+            fw.write(',' + str(var_matrix[i, j]))
+        fw.write('\n')
+
+    fw.close()
     ax = plt.subplot()
     sns.heatmap(var_matrix, cmap='RdBu', linewidths=0.05)
-    ax.invert_yaxis()
-    plt.show()
+    ax.set_ylabel('time periods')
+    ax.set_xlabel('roads')
+    # ax.yaxis.grid(True, linestyle='--')
+    # ax.xaxis.grid(True, linestyle='--')
+    plt.savefig(result_dir + 'var_assign.png', bbox_inches='tight')
+    plt.close()
+
     return
 
 
@@ -147,9 +156,6 @@ def speed_extract(file_path, interval, data_dir):
 
         if date not in dates:
             continue
-        # if time_period == 0 and date == '2012-11-07' and '11' in file_path:
-        #     print(t)
-        #     v_list.append(v)
         if v < 10 or v > 100:
             continue
 
@@ -162,9 +168,6 @@ def speed_extract(file_path, interval, data_dir):
         speed_dict[date][time_period][0] += v
         speed_dict[date][time_period][1] += 1
 
-    # if v_list:
-    #     print(sum(v_list) / len(v_list))
-    # dates = sorted(list(speed_dict.keys()))
     speed_arr = np.zeros((len(dates), periods))
 
     for i in range(len(dates)):
@@ -260,7 +263,7 @@ def mode_miss(data_dir, interval):
     plt.scatter(list(range(len(roads))), miss_rate)
     plt.xlabel("roads")
     plt.ylabel("missing_rate")
-    plt.savefig(result_dir + 'roads_missing.png')
+    plt.savefig(result_dir + 'roads_missing.png', bbox_inches='tight')
     plt.close()
 
     miss_rate = []
@@ -270,7 +273,7 @@ def mode_miss(data_dir, interval):
     plt.scatter(list(range(len(dates))), miss_rate)
     plt.xlabel("dates")
     plt.ylabel("missing_rate")
-    plt.savefig(result_dir + 'dates_missing.png')
+    plt.savefig(result_dir + 'dates_missing.png', bbox_inches='tight')
     plt.close()
     # plt.show()
 
@@ -281,7 +284,7 @@ def mode_miss(data_dir, interval):
     plt.scatter(list(range(periods)), miss_rate)
     plt.xlabel("periods")
     plt.ylabel("missing_rate")
-    plt.savefig(result_dir + 'periods_missing.png')
+    plt.savefig(result_dir + 'periods_missing.png', bbox_inches='tight')
     plt.close()
     # '''
     mean_speed = []
@@ -291,7 +294,7 @@ def mode_miss(data_dir, interval):
     plt.scatter(list(range(len(roads))), mean_speed)
     plt.xlabel("roads")
     plt.ylabel("mean_speed")
-    plt.savefig(result_dir + 'roads_mean_speed.png')
+    plt.savefig(result_dir + 'roads_mean_speed.png', bbox_inches='tight')
     plt.close()
 
     mean_speed = []
@@ -301,29 +304,33 @@ def mode_miss(data_dir, interval):
     plt.scatter(list(range(len(dates))), mean_speed)
     plt.xlabel("dates")
     plt.ylabel("mean_speed")
-    plt.savefig(result_dir + 'dates_mean_speed.png')
+    plt.savefig(result_dir + 'dates_mean_speed.png', bbox_inches='tight')
     plt.close()
     return
 
 
 if __name__ == '__main__':
-    init()
 
     raw_dir = 'D:/启东数据/启东流量数据/'
     roads_path = data_dir + 'road_map.txt'
     interval = 30
+    result_dir = result_dir + str(interval) + 'min/'
+    init()
+    unseed_path = result_dir + 'unseed_roads.txt'
     # complete(roads_path, raw_dir, interval, data_dir)
     # mode_miss(data_dir, interval)
-    # road_analyse(raw_dir, ['6', '14'], roads_path)
-    var_assign(interval)
+    road_analyse(raw_dir, ['8', '20'], roads_path)
+
+    # var_assign(unseed_path, interval)
     sys.exit()
 
-    RN = road_network.roadmap(roads_path, data_dir + 'impute/')
+    RN = road_network.roadmap(roads_path,
+                              data_dir + str(interval) + '_impute/')
 
-    train_rate = 0.8
-    time_period = '8'
+    train_rate = 0.6
+    time_period = '20'
     threshold = 1e-5
-    test_date = '2012-11-14'
+    test_date = '2012-11-16'
     sup_rate = 1
     alpha = 1
     # corr_thre = 0.5
@@ -336,13 +343,12 @@ if __name__ == '__main__':
 
     ori_RN = copy.deepcopy(RN)
 
-    RN.seed_select(K, time_period, train_rate, sup_rate)
+    RN.seed_select(K, train_rate, sup_rate)
     # print(sorted(list(RN.seeds)))
     for r in RN.seeds:
         RN.est_levels[r] = 0
         RN.known[r] = True
-    pop = population(RN, time_period, train_rate, 50, 0.9, 0.4, 200)
-    pop.run()
+
     sys.exit()
     # '''
 

@@ -7,6 +7,7 @@ from road import road
 import numpy as np
 import math
 from random import random
+from init import dates
 import copy
 
 
@@ -59,7 +60,7 @@ class roadmap:
         deltav1_list = rs1.delta_V[time_period]
         rs2 = self.road_info[id2]
         deltav2_list = rs2.delta_V[time_period]
-        indexes = rs1.V.index
+        indexes = dates
         indice = 0
         same_num = 0
         for i in range(len(indexes)):
@@ -70,7 +71,7 @@ class roadmap:
                 same_num += 1
         return same_num / indice
 
-    def get_1hop(self, id, time_period, rate):
+    def get_1hop(self, id, rate):
         start_id, end_id = self.roads[id]
         start_ids = self.start_ids
         end_ids = self.end_ids
@@ -109,7 +110,7 @@ class roadmap:
         rs.start_id = start_id
         rs.end_id = end_id
 
-        A1, E1 = self.get_1hop(id, time_period, rate)
+        A1, E1 = self.get_1hop(id, rate)
         # print(id, A1)
         rs.A1 = A1
         rs.UE |= E1
@@ -155,9 +156,9 @@ class roadmap:
 
         return res
 
-    def seed_select(self, K, time_period, rate, sup_rate):
+    def seed_select(self, seed_rate, rate, sup_rate):
         seed = set()
-
+        K = int(seed_rate * len(self.roads))
         while len(seed) <= K:
             max_rise = 0
             cov_sup_pre = self.cov_sup(seed, sup_rate)
@@ -233,7 +234,7 @@ class roadmap:
     def weight_learn(self, id, rate, time_period, threshold, alpha):
         # seed = self.seeds
         rs = self.road_info[id]
-        indexes = rs.V.index
+        indexes = dates
         delta_fun = dict()
         for edge in rs.UE:
             delta_fun[edge] = 0
@@ -260,7 +261,9 @@ class roadmap:
                         v_diff = rs.V_diff[time_period][date]
 
                         other_v_diff = other_rs.V_diff[time_period][date]
-                        temp1 += (diff_pre[i] - v_diff) * other_v_diff
+                        temp1 += (diff_pre[i] - v_diff) * other_v_diff \
+                        * self.effect_rate * rs.correlations[
+                            edge]
                     # print(edge, temp1)
                     delta_fun[edge] = alpha * temp1 / indice
                     rs.W[edge] = max(rs.W[edge] - alpha * temp1 / indice, 0)

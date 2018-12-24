@@ -1,4 +1,5 @@
 import random
+from init import dates
 
 
 class population:
@@ -69,7 +70,7 @@ class population:
         self.decode(chromosome)
         RN = self.RN
         unknown_roads = [r for r in RN.roads if RN.known[r] == False]
-        indexes = RN.road_info[list(RN.roads.keys())[0]].V.index
+        indexes = dates
         indice = 0
         mre_sum = 0
         while indice / len(indexes) < self.train_rate:
@@ -194,3 +195,4 @@ class population:
             # print(i, max(self.fitness),
             #       sum(self.fitness) / self.size, min(self.fitness))
             print(i, self.elitist['fitness'], self.elitist['age'])
+        self.decode(self.elitist['chromosome'])
