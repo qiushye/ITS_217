@@ -1,7 +1,7 @@
 ﻿# 忽略中间产生的data和实验结果
 impute/data
 impute/result
-predict/data
+predict/data/*_impute
 predict/result
 */__pychche__
 *.pyc

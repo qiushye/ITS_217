@@ -69,6 +69,23 @@ def extract_data(data_dir, interval):
     return times_data, roads
 
 
+def data_knn(RN, interval, time_period, train_end, test_start):
+
+    times_data, roads = extract_data(data_dir, interval)
+    seeds = list(RN.seeds)
+    un_seeds = list(set(roads) - RN.seeds)
+    un_seeds.sort()
+
+    X_train = times_data[time_period].ix[:train_end, seeds].values
+    Y_train = times_data[time_period].ix[:train_end, un_seeds, ].values
+    X_test = times_data[time_period].ix[test_start:test_start +
+                                        1, seeds].values
+    Y_test = times_data[time_period].ix[test_start:test_start +
+                                        1, un_seeds].values
+    return X_train, Y_train, X_test, Y_test
+
+
+'''
 interval = 30
 times_data, roads = extract_data(data_dir, interval)
 print(data_dir)
@@ -106,3 +123,4 @@ print('The mean squared error of uniform-weighted KNeighborsRegression:',
 print('The mean absolute error of uniform-weighted KNeighborsRegression:', \
 mean_absolute_error(Y_test, Y_predict))
 print(np.mean(abs(Y_test - Y_predict) / Y_test))
+'''

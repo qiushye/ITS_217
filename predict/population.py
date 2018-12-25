@@ -3,7 +3,8 @@ from init import dates
 
 
 class population:
-    def __init__(self, RN, time_period, train_rate, size, cp, mp, gen_max):
+    def __init__(self, RN, time_period, test_start, train_rate, size, cp, mp,
+                 gen_max):
         # 种群信息
         self.RN = RN
         roads = list(RN.roads.keys())
@@ -22,6 +23,7 @@ class population:
         self.links = links
         self.time_period = time_period
         self.train_rate = train_rate
+        self.test_start = test_start
         self.individuals = []  # 个体集合
         self.fitness = []  # 个体适应度集合
         self.selector_probability = []  # 个体选择概率集合
@@ -66,6 +68,7 @@ class population:
         return
 
     def fitness_func(self, chromosome):  # 将训练集的mre总和的倒数作为适应度
+        test_last_day = self.test_start - 1
         time_period = self.time_period
         self.decode(chromosome)
         RN = self.RN
@@ -73,17 +76,15 @@ class population:
         indexes = dates
         indice = 0
         mre_sum = 0
-        while indice / len(indexes) < self.train_rate:
-            indice += 1
 
-            for r in unknown_roads:
-                v_est = RN.online_est(r, indexes[indice], time_period,
-                                      self.train_rate)
+        for r in unknown_roads:
+            v_est = RN.online_est(r, indexes[test_last_day], time_period,
+                                  self.train_rate)
 
-                v_ori = RN.road_info[r].V[time_period][indexes[indice]]
-                mre_sum += abs(v_ori - v_est) / v_ori
+            v_ori = RN.road_info[r].V[time_period][indexes[test_last_day]]
+            mre_sum += abs(v_ori - v_est) / v_ori
 
-        return (indice + 1) * len(unknown_roads) / mre_sum
+        return len(unknown_roads) / mre_sum
 
     def evaluate(self):
         sp = self.selector_probability

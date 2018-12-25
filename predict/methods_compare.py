@@ -8,6 +8,7 @@ from lstm_model import lstm_predict
 from predict import estimate
 import os
 import matplotlib.pyplot as plt
+import math
 
 
 def extract_data(data_dir, interval):
@@ -146,10 +147,11 @@ def roads_result(interval, train_end, test_start, params):
         os.mkdir(res_dir)
 
     time_period = params['time_period']
-    markers = ['o', '*', 'D', '^']
-    colors = ['r', 'b', 'y', 'g']
+    markers = ['o', '*', 'D', '^', 'o']
+    colors = ['r', 'b', 'y', 'g', 'b']
 
     predict_res, un_seeds = compare(interval, train_end, test_start, params)
+    '''
     ax = plt.subplot()
     ax.set_xlabel("roads_order")
     ax.set_ylabel('MRE')
@@ -182,6 +184,39 @@ def roads_result(interval, train_end, test_start, params):
     plt.legend(loc='best')
     plt.savefig(res_dir + str(test_start) + 'day_' + time_period +
                 '_methods_roads_MRE.png')
+    plt.close()
+    '''
+    ax = plt.subplot()
+    ax.set_xlabel("roads_order")
+    ax.set_ylabel('speed')
+    ax.yaxis.grid(True, linestyle='--')
+    ax.xaxis.grid(True, linestyle='--')
+    k = 0
+    fw = open(
+        res_dir + 'speed_res/' + str(test_start) + 'day_' + time_period +
+        '_roads_speed_compare.csv', 'w')
+    fw.write(',' + ','.join(un_seeds) + '\n')
+    for method in predict_res:
+        # if method == 'ori':
+        #     continue
+
+        speed_arr = predict_res[method] * 100
+        fw.write(method + ',')
+        fw.write(','.join([str(round(speed, 1))
+                           for speed in speed_arr]) + '\n')
+        ax.plot(
+            range(len(un_seeds)),
+            speed_arr,
+            label='$' + method + '$',
+            marker=markers[k],
+            linestyle='-',
+            color=colors[k])
+        k += 1
+
+    fw.close()
+    plt.legend(loc='best')
+    plt.savefig(res_dir + 'speed_res/' + str(test_start) + 'day_' +
+                time_period + '_methods_roads_speed.png')
     plt.close()
     return
 
@@ -277,5 +312,7 @@ if __name__ == '__main__':
         'sup_rate': sup_rate,
         'seed_rate': seed_rate
     }
-
-    periods_compare(interval, train_end, test_start, params)
+    for period in range(4,48):
+        params['time_period'] = str(period)
+        roads_result(interval, train_end, test_start, params)
+    # periods_compare(interval, train_end, test_start, params)

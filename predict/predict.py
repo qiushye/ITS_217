@@ -9,6 +9,8 @@ import sys
 import math
 from init import dates, data_dir, result_dir
 from population import population
+from knn_predict import data_knn
+from sklearn.neighbors import KNeighborsRegressor
 
 
 def list_level(RN, road):
@@ -25,7 +27,7 @@ def level_weight(RN, road):
     return w
 
 
-def predict(RN, params):
+def predict(RN, params, knn_flag=False):
     time_s = time.time()
     train_rate = params['train_rate']
     time_period = params['time_period']
@@ -63,7 +65,7 @@ def predict(RN, params):
             RN.known[road] = True
 
             # delta_v = RN.trend_infer(road, test_date, time_period, train_rate)
-            v_mean, _ = mean_speed(RN, road, params)
+            v_mean, _ = speed_refer(RN, road, params, knn_flag)
             v_est = v_mean + v_diff_est
 
             # v_ori = RN.road_info[road].V[time_period][test_date]
@@ -77,22 +79,23 @@ def predict(RN, params):
                 key=lambda x: sum(j < RN.max_level for j in list_level(RN, x)),
                 reverse=True)
             ur = unknown_roads[0]
-            temp_RN = copy.deepcopy(RN)
-            if len(temp_RN.road_info[ur].A1) > 0:
-                while temp_RN.road_info[ur].A1:
-                    ar = list(temp_RN.road_info[ur].A1)[0]
-                    if temp_RN.est_levels[ar] >= temp_RN.max_level:
-                        temp_RN.road_info[ur].A1.remove(ar)
-                v_diff_est = temp_RN.speed_diff_est(ur, test_date, time_period)
-                RN.road_info[ur].V_diff[time_period][test_date] = v_diff_est
-                RN.est_levels[ur] = max(list_level(temp_RN, ur)) + 1
-                RN.known[ur] = True
+            # temp_RN = copy.deepcopy(RN)
+            # if len(temp_RN.road_info[ur].A1) > 0:
+            #     while temp_RN.road_info[ur].A1:
+            #         ar = list(temp_RN.road_info[ur].A1)[0]
+            #         if temp_RN.est_levels[ar] >= temp_RN.max_level:
+            #             temp_RN.road_info[ur].A1.remove(ar)
+            #     v_diff_est = temp_RN.speed_diff_est(ur, test_date, time_period)
+            #     RN.road_info[ur].V_diff[time_period][test_date] = v_diff_est
+            #     RN.est_levels[ur] = max(list_level(temp_RN, ur)) + 1
+            #     RN.known[ur] = True
 
-            else:
+            # else:
+            if 1:
                 RN.est_levels[ur] = 0
                 RN.known[ur] = True
                 RN.road_info[ur].V_diff[time_period][test_date] = 0
-                v_est, _ = mean_speed(RN, ur, params)
+                v_est, _ = speed_refer(RN, ur, params, knn_flag)
                 # v_ori = RN.road_info[ur].V[time_period][test_date]
 
             RN.road_info[ur].V[time_period][test_date] = v_est
@@ -174,7 +177,7 @@ def evaluate(ori_RN, est_RN, time_period, test_date):
     return round(rmse, 3), round(mre, 3)
 
 
-def estimate(RN, params):
+def estimate(RN, params, knn_flag=False):
     ori_RN = copy.deepcopy(RN)
 
     train_rate = params['train_rate']
@@ -207,21 +210,36 @@ def estimate(RN, params):
             RN.est_levels[r] = 0
             RN.known[r] = True
             RN.road_info[r].V_diff[time_period][test_date] = 0
-            v_est, _ = mean_speed(RN, r, params)
+            v_est, _ = speed_refer(RN, r, params, knn_flag)
 
             RN.road_info[r].V[time_period][test_date] = v_est
         else:
             RN.weight_learn(r, train_rate, time_period, threshold, alpha)
 
-    est_RN, run_time = predict(RN, params)
+    est_RN, run_time = predict(RN, params, knn_flag)
     # print(evaluate(ori_RN, est_RN, time_period, test_date))
     # print("run_time: " + str(run_time) + 's')
     return est_RN, run_time, uns_roads
 
 
-def mean_speed(RN, road, params):
+def speed_refer(RN, road, params, knn_flag=False):
     train_rate = params['train_rate']
     time_period = params['time_period']
+    if knn_flag:
+        interval = params['interval']
+        train_end = params['interval']
+        test_start = params['test_start']
+        un_seeds = list(RN.roads.keys() - RN.seeds)
+        un_seeds.sort()
+
+        knn_X_train, knn_Y_train, knn_X_test, knn_Y_test = data_knn(
+            RN, interval, time_period, train_end, test_start)
+        uni_knr = KNeighborsRegressor(weights='uniform')  #初始化平均回归的KNN回归器
+        uni_knr.fit(knn_X_train, knn_Y_train)
+        knn_Y_predict = uni_knr.predict(knn_X_test)
+        knn_Y_predict = np.reshape(knn_Y_predict, len(un_seeds))
+        speed_dict = dict(zip(un_seeds, knn_Y_predict))
+        return speed_dict[road], 0
     v_sum = 0
     for i in range(len(dates)):
         if i / len(dates) > train_rate:
@@ -240,15 +258,19 @@ def compare_res(RN, params):
     for r in RN.roads:
         RN.get_info(r, data_dir, time_period, train_rate)
     ori_RN = copy.deepcopy(RN)
-    # est_RN, _, roads = estimate(RN, params)
-    est_RN, _, roads = ga_opt(RN, params)
+    ga_RN = copy.deepcopy(RN)
+    est_RN, _, roads = estimate(RN, params)
+
+    ga_RN, _, roads = estimate(ga_RN, params, True)
 
     ori_list, model_est_list, weight_est_list = [], [], []
+    ga_est_list = []
 
     for road in roads:
-        mean_v, _ = mean_speed(RN, road, params)
+        mean_v, _ = speed_refer(RN, road, params)
         ori_list.append(ori_RN.road_info[road].V[time_period][test_date])
         model_est_list.append(est_RN.road_info[road].V[time_period][test_date])
+        ga_est_list.append(ga_RN.road_info[road].V[time_period][test_date])
         RN.road_info[road].W = est_RN.road_info[road].W
         v_diff_est = RN.speed_diff_est(road, test_date, time_period)
         v_est = v_diff_est + mean_v
@@ -268,8 +290,9 @@ def compare_res(RN, params):
         model_est_list,
         label='$model-est-speed$',
         color='r')
-    ax.plot(
-        range(len(roads)), weight_est_list, label='$weight-speed$', color='y')
+    # ax.plot(
+    #     range(len(roads)), weight_est_list, label='$weight-speed$', color='y')
+    ax.plot(range(len(roads)), ga_est_list, label='$ga-speed$', color='g')
     # for i, (_x, _y) in enumerate(zip(range(len(roads)), ori_list)):
     #     plt.text(_x, _y, roads[i], color='black', fontsize=12)
     plt.legend(loc='best')
@@ -281,30 +304,30 @@ def compare_res(RN, params):
     return
 
 
-def ga_opt(RN, params):
+def ga_knn_opt(RN, params):
     # ori_RN = copy.deepcopy(RN)
     train_rate = params['train_rate']
     time_period = params['time_period']
     seed_rate = params['seed_rate']
     test_date = params['test_date']
+    test_start = params['test_start']
+    train_end = params['train_end']
     # threshold = params['threshold']
     # alpha = params['alpha']
-    for r in RN.roads:
-        RN.get_info(r, data_dir, time_period, train_rate)
-    if len(RN.seeds) == 0:
-        RN.seed_select(seed_rate, train_rate, sup_rate)
-        print(RN.seeds)
-    for r in RN.seeds:
-        RN.est_levels[r] = 0
-        RN.known[r] = True
 
     uns_roads = []
     for road in RN.roads:
         if road in RN.seeds:
+            RN.est_levels[road] = 0
+            RN.known[road] = True
             continue
+        RN.est_levels[road] = RN.max_level
+        RN.known[road] = False
         uns_roads.append(road)
+    uns_roads.sort()
 
-    pop = population(RN, time_period, train_rate, 50, 0.9, 0.4, 200)
+    pop = population(RN, time_period, test_start, train_rate, 50, 0.9, 0.4,
+                     200)
     pop.run()
     RN = pop.RN
 
@@ -314,11 +337,11 @@ def ga_opt(RN, params):
             RN.est_levels[r] = 0
             RN.known[r] = True
             RN.road_info[r].V_diff[time_period][test_date] = 0
-            v_est, _ = mean_speed(RN, r, params)
+            v_est, _ = speed_refer(RN, r, params)
 
             RN.road_info[r].V[time_period][test_date] = v_est
 
-    est_RN, run_time = predict(RN, params)
+    est_RN, run_time = predict(RN, params, True)
     # print(evaluate(ori_RN, est_RN, time_period, test_date))
     # print("run_time: " + str(run_time) + 's')
     return est_RN, run_time, uns_roads
@@ -331,10 +354,13 @@ if __name__ == '__main__':
     RN = road_network.roadmap(roads_path,
                               data_dir + str(interval) + '_impute/')
     print(RN.roads.keys())
+    train_end = 12
+    test_start = 12
     train_rate = 0.6
+    train_rate = (train_end - 1) / len(dates)
     time_period = '15'
     threshold = 1e-5
-    test_date = '2012-11-16'
+    test_date = dates[test_start]
     sup_rate = 1
     alpha = 1
     seed_rate = 0.3
@@ -345,13 +371,15 @@ if __name__ == '__main__':
         'alpha': alpha,
         'test_date': test_date,
         'sup_rate': sup_rate,
-        'seed_rate': seed_rate
+        'seed_rate': seed_rate,
+        'test_start': test_start,
+        'train_end': train_end,
+        'interval': interval
     }
     # corr_thre = 0.5
 
-    estimate(RN, params)
+    # estimate(RN, params)
     # periods_predict(RN, params)
-    # compare_res(RN, params)
-    # ga_opt(RN, params)
+    compare_res(RN, params)
 
     sys.exit()
