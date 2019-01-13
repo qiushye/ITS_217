@@ -19,7 +19,6 @@ import tensor_cpt as tc
 import scipy.io as scio
 os.sys.path.append('./ppca-master/src/')
 import pca
-from PPCA import *
 from sklearn.model_selection import train_test_split
 
 #Truncated SVD

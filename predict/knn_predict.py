@@ -1,56 +1,15 @@
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import ShuffleSplit
-from sklearn.model_selection import train_test_split
-from sklearn.datasets import load_boston
-from sklearn.preprocessing import StandardScaler
 
-from sklearn.metrics import make_scorer
 from sklearn.neighbors import KNeighborsRegressor
-from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+# from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from init import data_dir, dates, result_dir
 import road_network
 import os
 import sys
 
 
-def performance_metric(Y_true, Y_predict):
-    """ Calculates and returns the performance score between 
-        true and predicted values based on the metric chosen. """
-
-    score = r2_score(Y_true, Y_predict)
-
-    return score
-
-
-def fit_model_shuffle(X, y):
-    """ Performs grid search over the 'max_depth' parameter for a 
-        decision tree regressor trained on the input data [X, y]. """
-
-    # Create cross-validation sets from the training data
-    cv_sets = ShuffleSplit(n_splits=10, test_size=0.20, random_state=0)
-
-    # Create a KNN regressor object
-    regressor = KNeighborsRegressor()
-    # Create a dictionary for the parameter 'n_neighbors' with a range from 3 to 10
-    params = {'n_neighbors': range(3, 10)}
-
-    # Transform 'performance_metric' into a scoring function using 'make_scorer'
-    scoring_fnc = make_scorer(performance_metric)
-
-    # Create the grid search object
-    grid = GridSearchCV(
-        regressor, param_grid=params, scoring=scoring_fnc, cv=cv_sets)
-
-    # Fit the grid search object to the data to compute the optimal model
-    grid = grid.fit(X, y)
-
-    # Return the optimal model after fitting the data
-    return grid.best_estimator_
-
-
-def extract_data(data_dir, interval):
+def extract_data(data_dir, interval):  # 提取数据
     times_data = {}
     data_dir = data_dir + str(interval) + '_impute/'
     roads = []
@@ -69,7 +28,7 @@ def extract_data(data_dir, interval):
     return times_data, roads
 
 
-def data_knn(RN, interval, time_period, train_end, test_start):
+def data_knn(RN, interval, time_period, train_end, test_start):  # 生成训练集和测试集
 
     times_data, roads = extract_data(data_dir, interval)
     seeds = list(RN.seeds)
@@ -77,7 +36,7 @@ def data_knn(RN, interval, time_period, train_end, test_start):
     un_seeds.sort()
 
     X_train = times_data[time_period].ix[:train_end, seeds].values
-    Y_train = times_data[time_period].ix[:train_end, un_seeds, ].values
+    Y_train = times_data[time_period].ix[:train_end, un_seeds].values
     X_test = times_data[time_period].ix[test_start:test_start +
                                         1, seeds].values
     Y_test = times_data[time_period].ix[test_start:test_start +

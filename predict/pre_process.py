@@ -20,10 +20,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from population import population
 
-from init import dates, cur_dir, data_dir, result_dir
+from init import dates, cur_dir, data_dir, result_dir, weekday, weekend, weekday_index, weekend_index
+dates = weekday
 
 
-def init():
+def init():  # 初始化目录
 
     if not os.path.exists(data_dir):
         os.mkdir(data_dir)
@@ -32,7 +33,7 @@ def init():
         os.mkdir(result_dir)
 
 
-def speed_assign(file_path):
+def speed_assign(file_path):  # 速度等级分布统计
     df = pd.read_excel(file_path, skip_footer=1)
     if 'speed' not in df.columns:
         df.columns = ['road', 'vol', 'speed', 'last-update-time']
@@ -62,7 +63,7 @@ def speed_assign(file_path):
     return v_array
 
 
-def road_analyse(raw_dir, all_roads, roads_path):
+def road_analyse(raw_dir, all_roads, roads_path):  # 分析路段整体速度按日期的变化情况
     # all_roads = []
     # with open(roads_path, 'r') as f:
     #     for line in f:
@@ -90,7 +91,7 @@ def road_analyse(raw_dir, all_roads, roads_path):
     return
 
 
-def var_assign(unseed_path, interval):
+def var_assign(unseed_path, interval):  # 非种子路段方差变化情况
     uns_roads = []
     with open(unseed_path, 'r') as f:
         uns_roads = f.readline().strip().split(',')
@@ -111,7 +112,7 @@ def var_assign(unseed_path, interval):
     for i in range(sp[0]):
         fw.write(str(i))
         for j in range(sp[1]):
-            var_matrix[i, j] = round(np.var(speed_tensor[j, :, i]))
+            var_matrix[i, j] = round(np.var(speed_tensor[j, weekday_index, i]))
             fw.write(',' + str(var_matrix[i, j]))
         fw.write('\n')
 
@@ -128,7 +129,7 @@ def var_assign(unseed_path, interval):
     return
 
 
-def speed_extract(file_path, interval, data_dir):
+def speed_extract(file_path, interval, data_dir):  # 处理源采样数据，聚合成设定时间间隔的速度数据
     df = pd.read_excel(file_path, skip_footer=1)
     if 'speed' not in df.columns:
         df.columns = ['road', 'vol', 'speed', 'last-update-time']
@@ -186,7 +187,8 @@ def speed_extract(file_path, interval, data_dir):
     return speed_arr
 
 
-def complete(roads_path, raw_dir, interval, data_dir):
+def complete(roads_path, raw_dir, interval,
+             data_dir):  # 对所有路段的数据源进行预处理，并用HaLRTC-CSP做预填充
     roads = []
     road_data = []
     periods = 24 * 60 // interval
@@ -202,7 +204,6 @@ def complete(roads_path, raw_dir, interval, data_dir):
         id = file.split('.')[0].split('Viewer')[1]
         if id not in roads:
             continue
-        # if id == '11':
         arr = speed_extract(raw_dir + file, interval, data_dir)
         # continue
         road_data.append(arr)
@@ -243,8 +244,8 @@ def complete(roads_path, raw_dir, interval, data_dir):
     return W
 
 
-def mode_miss(data_dir, interval):
-    periods = 24 * 60 // interval
+def mode_miss(data_dir, interval, time_period):  # 各个维度的缺失情况
+    # periods = 24 * 60 // interval
     road_data = []
     roads = []
     miss_dir = data_dir + str(interval) + '_before_impute/'
@@ -258,7 +259,7 @@ def mode_miss(data_dir, interval):
         road_data.append(arr)
 
     speed_tensor = np.array(road_data)
-    # '''
+    '''
     miss_rate = []
     for i in range(len(roads)):
         M = speed_tensor[i]
@@ -289,49 +290,96 @@ def mode_miss(data_dir, interval):
     plt.ylabel("missing_rate")
     plt.savefig(result_dir + 'periods_missing.png', bbox_inches='tight')
     plt.close()
-    # '''
-    mean_speed = []
+    '''
+    '''
+    weekday_mean_speed = []
+    weekend_mean_speed = []
+    weekday_var, weekend_var = [], []
     for i in range(len(roads)):
-        M = speed_tensor[i]
-        mean_speed.append(M.sum() / (M > 0).sum())
-    plt.scatter(list(range(len(roads))), mean_speed)
+        weekday_M = speed_tensor[i, weekday_index, int(time_period)]
+        weekend_M = speed_tensor[i, weekend_index, int(time_period)]
+        weekday_mean_speed.append(weekday_M.sum() / (weekday_M > 0).sum())
+        weekend_mean_speed.append(weekend_M.sum() / (weekend_M > 0).sum())
+        weekday_var.append(np.var(weekday_M))
+        weekend_var.append(np.var(weekend_M))
+    plt.scatter(
+        list(range(len(roads))),
+        weekday_mean_speed,
+        marker='o',
+        label='weekday')
+    plt.scatter(
+        list(range(len(roads))),
+        weekend_mean_speed,
+        marker='*',
+        label='weekend')
     plt.xlabel("roads")
     plt.ylabel("mean_speed")
+    plt.legend(loc='best')
     plt.savefig(result_dir + 'roads_mean_speed.png', bbox_inches='tight')
     plt.close()
 
-    mean_speed = []
-    for i in range(len(dates)):
-        M = speed_tensor[:, i, :]
-        mean_speed.append(M.sum() / (M > 0).sum())
-    plt.scatter(list(range(len(dates))), mean_speed)
-    plt.xlabel("dates")
-    plt.ylabel("mean_speed")
-    plt.savefig(result_dir + 'dates_mean_speed.png', bbox_inches='tight')
+    plt.scatter(
+        list(range(len(roads))), weekday_var, marker='o', label='weekday')
+    plt.scatter(
+        list(range(len(roads))), weekend_var, marker='*', label='weekend')
+    plt.xlabel("roads")
+    plt.ylabel("variance")
+    plt.legend(loc='best')
+    plt.savefig(result_dir + 'roads_var.png', bbox_inches='tight')
     plt.close()
+    '''
+    weekday1_roads_speed = speed_tensor[:, weekend_index[0], int(time_period)]
+    weekday2_roads_speed = speed_tensor[:, weekend_index[1], int(time_period)]
+
+    plt.scatter(
+        list(range(len(roads))),
+        weekday1_roads_speed,
+        marker='o',
+        label='2012-11-10')
+    plt.scatter(
+        list(range(len(roads))),
+        weekday2_roads_speed,
+        marker='*',
+        label='2012-11-11')
+    plt.xlabel("roads")
+    plt.ylabel("speed(km/h)")
+    plt.legend(loc='best')
+    plt.savefig(result_dir + 'roads_speed.png', bbox_inches='tight')
+    plt.close()
+
+    # mean_speed = []
+    # for i in range(len(dates)):
+    #     M = speed_tensor[:, i, :]
+    #     mean_speed.append(M.sum() / (M > 0).sum())
+    # plt.scatter(list(range(len(dates))), mean_speed)
+    # plt.xlabel("dates")
+    # plt.ylabel("mean_speed")
+    # plt.savefig(result_dir + 'dates_mean_speed.png', bbox_inches='tight')
+    # plt.close()
     return
 
 
 if __name__ == '__main__':
 
-    raw_dir = '/home/qiushye/启东流量数据/'
+    raw_dir = 'D:/启东数据/启东流量数据/'
     roads_path = data_dir + 'road_map.txt'
     interval = 30
-    result_dir = result_dir + str(interval) + 'min/'
+    time_period = '20'
+    # result_dir = result_dir + str(interval) + 'min/'
     init()
     unseed_path = result_dir + 'unseed_roads.txt'
-    complete(roads_path, raw_dir, interval, data_dir)
-    # mode_miss(data_dir, interval)
-    # road_analyse(raw_dir, ['8', '20'], roads_path)
+    # complete(roads_path, raw_dir, interval, data_dir)
+    # mode_miss(data_dir, interval, time_period)
+    road_analyse(raw_dir, ['8', '20'], roads_path)
 
     # var_assign(unseed_path, interval)
     sys.exit()
-
-    RN = road_network.roadmap(roads_path,
+    train_end = 10
+    RN = road_network.roadmap(roads_path, train_end,
                               data_dir + str(interval) + '_impute/')
 
     train_rate = 0.6
-    time_period = '20'
+
     threshold = 1e-5
     test_date = '2012-11-16'
     sup_rate = 1
@@ -339,24 +387,3 @@ if __name__ == '__main__':
     # corr_thre = 0.5
     seed_rate = 0.3
     K = int(seed_rate * len(RN.roads))
-
-    # '''
-    for r in RN.roads:
-        RN.get_info(r, data_dir, time_period, train_rate)
-
-    ori_RN = copy.deepcopy(RN)
-
-    RN.seed_select(K, train_rate, sup_rate)
-    # print(sorted(list(RN.seeds)))
-    for r in RN.seeds:
-        RN.est_levels[r] = 0
-        RN.known[r] = True
-
-    sys.exit()
-    # '''
-
-    roads = list(RN.roads.keys())
-    roads.sort(key=lambda l: len(RN.road_info[l].A1 & RN.seeds), reverse=True)
-    print(RN.road_info['45'].A1)
-    print('------------------')
-    id = roads[0]

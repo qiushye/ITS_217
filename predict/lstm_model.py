@@ -19,7 +19,7 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import r2_score
 
 
-def split_dataset(dataset, train_rate, time_step):
+def split_dataset(dataset, train_rate, time_step):  # 生成训练集和测试集
     days = dataset.shape[0]
     X_train, X_test = [], []
     Y_train, Y_test = [], []
@@ -53,7 +53,7 @@ def lstm_predict(n_step, n_input, X_train, Y_train, X_test):
     return predictions
 
 
-# '''
+'''
 # create sequence
 interval = 30
 id = '20'
@@ -83,4 +83,4 @@ print(predictions.shape)
 
 # 4. evaluate network
 # loss = model.evaluate(X_test, Y_test, verbose=0)
-# '''
+'''

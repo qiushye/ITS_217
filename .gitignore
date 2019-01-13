@@ -5,3 +5,6 @@ predict/data/*_impute
 predict/result
 */__pychche__
 *.pyc
+*.png
+*.csv
+*.rar

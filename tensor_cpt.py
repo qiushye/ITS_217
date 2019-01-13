@@ -493,6 +493,65 @@ def ori_imputation(miss_data,W,ori_speeddata,ori_W):
     plt.close()
     return
 
+def var_assign(speed_tensor):
+
+    var_matrix = np.zeros_like(speed_tensor[:, :,0].T)
+    mean_matrix = np.zeros_like(var_matrix)
+    sp = var_matrix.shape
+    fw = open('var_assign.csv', 'w')
+    for i in range(sp[0]):
+        fw.write(str(i))
+        for j in range(sp[1]):
+            var_matrix[i, j] = round(np.var(speed_tensor[j,i, :]))
+            mean_matrix[i, j] = round(np.mean(speed_tensor[j,i, :]))
+            fw.write(',' + str(var_matrix[i, j]))
+        fw.write('\n')
+
+    fw.close()
+    ax = plt.subplot()
+    # sns.heatmap(var_matrix, cmap='RdBu', linewidths=0.05)
+    ax.plot(range(sp[1]),var_matrix[1,:])
+    ax.set_ylabel('variance')
+    ax.set_xlabel('road_order')
+    ax.yaxis.grid(True, linestyle='--')
+    # ax.xaxis.grid(True, linestyle='--')
+    plt.savefig('var_assign.png', bbox_inches='tight')
+    plt.close()
+
+    ax = plt.subplot()
+    # sns.heatmap(var_matrix, cmap='RdBu', linewidths=0.05)
+    ax.plot(range(sp[1]),mean_matrix[1,:])
+    ax.set_ylabel('mean speed')
+    ax.set_xlabel('road_order')
+    ax.yaxis.grid(True, linestyle='--')
+    # ax.xaxis.grid(True, linestyle='--')
+    plt.savefig('mean_assign.png', bbox_inches='tight')
+    plt.close()
+
+    return
+
+def speed_vary(ori_data):
+    i,j,k = 0,0,0
+    periods_data = ori_data[i, j,:]
+    
+    ax = plt.subplot()
+    ax.set_ylabel('speed(km/h)')
+    ax.set_xlabel('periods')
+    ax.plot(range(len(periods_data)),periods_data)
+    plt.savefig('periods_vary.png')
+    plt.close()
+
+    dates_data = ori_data[i,:,k]
+    ax = plt.subplot()
+    ax.set_ylabel('speed(km/h)')
+    ax.set_xlabel('dates')
+    ax.plot(range(len(dates_data)),dates_data)
+    plt.savefig('dates_vary.png')
+    plt.close()
+
+    return
+
+
 if __name__ == '__main__':
     data_dir = './data/'
     img_dir = './img_test/'
@@ -515,10 +574,11 @@ if __name__ == '__main__':
     ori_speeddata,ori_W = deal_orimiss(ori_speeddata,shorten)
     data_size = np.shape(ori_speeddata)
     print(data_size)
-
+    # var_assign(ori_speeddata)
+    speed_vary(ori_speeddata)
     # compare_methods(ori_speeddata,ori_W)
     # compare_PI(ori_speeddata,ori_W)
-    #sys.exit()
+    sys.exit()
     miss_ratio = 0.2
     miss_path = data_dir+'miss_'+str(round(miss_ratio,1))+'_'+'_'.join([str(ch) for ch in data_size])+'.mat'
     #miss_path = data_dir+'cont_miss_'+'_'.join([str(ch) for ch in data_size])+'.mat'

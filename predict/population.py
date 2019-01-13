@@ -14,9 +14,9 @@ class population:
             rs = RN.road_info[r]
             UE = list(rs.UE)
             links += UE
-            for link in UE:
-                w = rs.W[link]
-                bin_str = bin(int(w * 1000 / 1024))[2:]
+            for _ in UE:
+                # w = rs.W[link]
+                bin_str = bin(random.randint(0, 2**10 - 1))[2:]
                 individual += list(
                     map(int, (10 - len(bin_str)) * '0' + bin_str))
                 # print(w)
@@ -57,7 +57,7 @@ class population:
             self.fitness.append(0)
             self.selector_probability.append(0)
 
-    def decode(self, chromosome):
+    def decode(self, chromosome):  # 对路网的权值进行排序编码
         # n = float(2**self.chromosome_size - 1)
         for i in range(len(self.links)):
             link = self.links[i]
@@ -74,25 +74,23 @@ class population:
         RN = self.RN
         unknown_roads = [r for r in RN.roads if RN.known[r] == False]
         indexes = dates
-        indice = 0
         mre_sum = 0
 
         for r in unknown_roads:
-            v_est = RN.online_est(r, indexes[test_last_day], time_period,
-                                  self.train_rate)
-
-            v_ori = RN.road_info[r].V[time_period][indexes[test_last_day]]
-            mre_sum += abs(v_ori - v_est) / v_ori
+            v_diff_est = RN.speed_diff_est(r, indexes[test_last_day],
+                                           time_period)
+            v_diff_ori = RN.road_info[r].V_diff[time_period][
+                indexes[test_last_day]]
+            mre_sum += abs((v_diff_ori - v_diff_est) / v_diff_ori)
 
         return len(unknown_roads) / mre_sum
 
-    def evaluate(self):
+    def evaluate(self):  # 种群个体评价
         sp = self.selector_probability
         # road_info_pre = self.RN.road_info
         for i in range(self.size):
             self.fitness[i] = self.fitness_func(self.individuals[i])
             # print(self.individuals[i])
-            # print(self.fitness[i])
             # print(self.RN.road_info['45'].W)
         ft_sum = sum(self.fitness)
         for i in range(self.size):
@@ -100,7 +98,7 @@ class population:
         for i in range(1, self.size):
             sp[i] = sp[i] + sp[i - 1]
 
-    def select(self):
+    def select(self):  # 选择交叉个体
         (t, i) = (random.random(), 0)
         for p in self.selector_probability:
             if p > t:
@@ -108,7 +106,7 @@ class population:
             i = i + 1
         return i
 
-    def cross(self, chrom1, chrom2):
+    def cross(self, chrom1, chrom2):  # 交叉生成下一代
         p = random.random()
         if chrom1 != chrom2 and p < self.crossover_probability:
             t = random.randint(1, self.chromosome_size - 1)
@@ -117,7 +115,7 @@ class population:
                                 chrom2[:t] + chrom1[t:])
         return (chrom1, chrom2)
 
-    def mutate(self, chrom):
+    def mutate(self, chrom):  # 变异
         p = random.random()
         if p < self.mutation_probability:
             t = random.randint(0, self.chromosome_size - 1)
@@ -190,7 +188,7 @@ class population:
             self.individuals[i] = self.new_individuals[i]
         self.age += 1
 
-    def run(self):
+    def run(self):  # 更新出最优个体作为路网的权值
         for i in range(self.generation_max):
             self.evolve()
             # print(i, max(self.fitness),

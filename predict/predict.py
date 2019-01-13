@@ -7,27 +7,28 @@ matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import sys
 import math
-from init import dates, data_dir, result_dir
+from init import dates, data_dir, result_dir,weekday
+dates = weekday
 from population import population
 from knn_predict import data_knn
 from sklearn.neighbors import KNeighborsRegressor
 
 
-def list_level(RN, road):
+def list_level(RN, road):  # 列出模型内的估计等级列表
     levels = []
     for tr in RN.road_info[road].A1:
         levels.append(RN.est_levels[tr])
     return levels
 
 
-def level_weight(RN, road):
+def level_weight(RN, road):  # 获取模型内的估计权值
     w = 0
     for l in list_level(RN, road):
         w += 2**(-l)
     return w
 
 
-def predict(RN, params, knn_flag=False):
+def predict(RN, params, knn_flag=False):  # 用一阶模型按参数对整个路网进行训练和预测
     time_s = time.time()
     train_rate = params['train_rate']
     time_period = params['time_period']
@@ -107,7 +108,7 @@ def predict(RN, params, knn_flag=False):
     return RN, int(time_e - time_s)
 
 
-def periods_predict(RN, params):
+def periods_predict(RN, params):  # 对所有的时段进行预测
     time_list = list(map(str, list(range(48))))
     mre_list = []
     rmse_list = []
@@ -155,7 +156,7 @@ def periods_predict(RN, params):
     return
 
 
-def evaluate(ori_RN, est_RN, time_period, test_date):
+def evaluate(ori_RN, est_RN, time_period, test_date):  # 评价预测效果，指标为rmse,mre
     rmse, mre = 0, 0
     N = len(est_RN.roads) - len(est_RN.seeds)
 
@@ -177,19 +178,20 @@ def evaluate(ori_RN, est_RN, time_period, test_date):
     return round(rmse, 3), round(mre, 3)
 
 
-def estimate(RN, params, knn_flag=False):
-    ori_RN = copy.deepcopy(RN)
+def estimate(RN, params, knn_flag=False):  # 初始化种子、估计等级和已知性，然后利用一阶模型预测
+    # ori_RN = copy.deepcopy(RN)
 
     train_rate = params['train_rate']
     time_period = params['time_period']
     seed_rate = params['seed_rate']
     test_date = params['test_date']
     threshold = params['threshold']
+    sup_rate = params['sup_rate']
     alpha = params['alpha']
     for r in RN.roads:
         RN.get_info(r, data_dir, time_period, train_rate)
     if len(RN.seeds) == 0:
-        RN.seed_select(seed_rate, train_rate, sup_rate)
+        RN.seed_select(seed_rate, sup_rate)
         print(RN.seeds)
     for r in RN.seeds:
         RN.est_levels[r] = 0
@@ -207,6 +209,7 @@ def estimate(RN, params, knn_flag=False):
     for r in uns_roads:
 
         if len(RN.road_info[r].A1) == 0:
+            print('----')
             RN.est_levels[r] = 0
             RN.known[r] = True
             RN.road_info[r].V_diff[time_period][test_date] = 0
@@ -222,19 +225,20 @@ def estimate(RN, params, knn_flag=False):
     return est_RN, run_time, uns_roads
 
 
-def speed_refer(RN, road, params, knn_flag=False):
+def speed_refer(RN, road, params, knn_flag=False):  # 速度基准参考，平均速度或knn回归值
     train_rate = params['train_rate']
     time_period = params['time_period']
     if knn_flag:
         interval = params['interval']
-        train_end = params['interval']
+        train_end = params['train_end']
         test_start = params['test_start']
         un_seeds = list(RN.roads.keys() - RN.seeds)
         un_seeds.sort()
 
-        knn_X_train, knn_Y_train, knn_X_test, knn_Y_test = data_knn(
+        knn_X_train, knn_Y_train, knn_X_test, _ = data_knn(
             RN, interval, time_period, train_end, test_start)
         uni_knr = KNeighborsRegressor(weights='uniform')  #初始化平均回归的KNN回归器
+
         uni_knr.fit(knn_X_train, knn_Y_train)
         knn_Y_predict = uni_knr.predict(knn_X_test)
         knn_Y_predict = np.reshape(knn_Y_predict, len(un_seeds))
@@ -249,19 +253,19 @@ def speed_refer(RN, road, params, knn_flag=False):
     return v_sum / count, count
 
 
-def compare_res(RN, params):
-    train_rate = params['train_rate']
+def compare_res(RN, params):  # 一阶模型和遗传优化、真实速度的对比
+    # train_rate = params['train_rate']
     time_period = params['time_period']
     # seed_rate = params['seed_rate']
     test_date = params['test_date']
     # sup_rate = params['sup_rate']
-    for r in RN.roads:
-        RN.get_info(r, data_dir, time_period, train_rate)
+    # for r in RN.roads:
+    #     RN.get_info(r, data_dir, time_period, train_rate)
     ori_RN = copy.deepcopy(RN)
     ga_RN = copy.deepcopy(RN)
     est_RN, _, roads = estimate(RN, params)
 
-    ga_RN, _, roads = estimate(ga_RN, params, True)
+    ga_RN, _, roads = ga_knn_opt(ga_RN, params)
 
     ori_list, model_est_list, weight_est_list = [], [], []
     ga_est_list = []
@@ -291,8 +295,8 @@ def compare_res(RN, params):
         label='$model-est-speed$',
         color='r')
     # ax.plot(
-    #     range(len(roads)), weight_est_list, label='$weight-speed$', color='y')
-    ax.plot(range(len(roads)), ga_est_list, label='$ga-speed$', color='g')
+    #     range(len(roads)), weight_est_list, label='$weight-speed$', color='g')
+    ax.plot(range(len(roads)), ga_est_list, label='$ga-speed$', color='y')
     # for i, (_x, _y) in enumerate(zip(range(len(roads)), ori_list)):
     #     plt.text(_x, _y, roads[i], color='black', fontsize=12)
     plt.legend(loc='best')
@@ -304,17 +308,19 @@ def compare_res(RN, params):
     return
 
 
-def ga_knn_opt(RN, params):
+def ga_knn_opt(RN, params):  # 遗传算法+knn优化
     # ori_RN = copy.deepcopy(RN)
     train_rate = params['train_rate']
     time_period = params['time_period']
     seed_rate = params['seed_rate']
+    sup_rate = params['sup_rate']
     test_date = params['test_date']
     test_start = params['test_start']
-    train_end = params['train_end']
+    # train_end = params['train_end']
     # threshold = params['threshold']
     # alpha = params['alpha']
 
+    RN.seed_select(seed_rate, sup_rate)
     uns_roads = []
     for road in RN.roads:
         if road in RN.seeds:
@@ -351,13 +357,11 @@ if __name__ == '__main__':
     raw_dir = 'D:/启东数据/启东流量数据/'
     roads_path = data_dir + 'road_map.txt'
     interval = 30
-    RN = road_network.roadmap(roads_path,
-                              data_dir + str(interval) + '_impute/')
-    print(RN.roads.keys())
-    train_end = 12
-    test_start = 12
+    train_end = 9
+    test_start = 10
+
     train_rate = 0.6
-    train_rate = (train_end - 1) / len(dates)
+    train_rate = train_end / len(dates)
     time_period = '15'
     threshold = 1e-5
     test_date = dates[test_start]
@@ -376,9 +380,14 @@ if __name__ == '__main__':
         'train_end': train_end,
         'interval': interval
     }
-    # corr_thre = 0.5
+
+    RN = road_network.roadmap(roads_path, train_end,
+                              data_dir + str(interval) + '_impute/')
+    for r in RN.roads:
+        RN.get_info(r, data_dir, time_period, train_rate)
 
     # estimate(RN, params)
+    # ga_knn_opt(RN, params)
     # periods_predict(RN, params)
     compare_res(RN, params)
 

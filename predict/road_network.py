@@ -13,13 +13,14 @@ import copy
 
 
 class roadmap:
-    def __init__(self, roads_path, data_dir):
+    def __init__(self, roads_path, train_end, data_dir):
         # 路网文件格式：road_id, start_id-end_id
         roads = dict()
         start_ids = dict()
         end_ids = dict()
 
         with open(roads_path, 'r') as f:
+            # 将所有路段的起止端点记录好，为后续建立一阶模型提供基础
             for line in f:
                 row = line.strip().split(',')
                 road_id = row[0]
@@ -35,20 +36,20 @@ class roadmap:
                 end_ids[end_id].append(road_id)
 
         self.roads = roads
-        self.road_info = dict()
-        self.start_ids = start_ids
-        self.end_ids = end_ids
-        self.seeds = set()
-        self.effect_rate = 0.9
-        self.max_level = 100
-        self.est_levels = dict()
-        self.known = dict()
+        self.road_info = dict()  # 路段的模型信息
+        self.start_ids = start_ids  # 所有起始点的索引路段
+        self.end_ids = end_ids  # 所有终止点的索引路段
+        self.seeds = set()  # 路网的种子集合
+        self.effect_rate = 0.9  # 传播因子
+        self.max_level = 100  # 最大估计等级
+        self.est_levels = dict()  # 估计等级索引
+        self.known = dict()  # 已知性索引
         for r in roads:
             self.est_levels[r] = self.max_level
             self.known[r] = False
 
-        for r in roads:
-            rs = road(data_dir + r + '.csv')
+        for r in roads:  # 初始化路段模型数据
+            rs = road(data_dir + r + '.csv', train_end)
             self.road_info[r] = rs
 
         # self.data = dict()
@@ -56,7 +57,7 @@ class roadmap:
         #     rs = road(r + '.csv')
         #     self.data[r] = rs
 
-    def corr(self, id1, id2, time_period, rate):
+    def corr(self, id1, id2, time_period, rate):  # 相关性系数计算
         rs1 = self.road_info[id1]
         deltav1_list = rs1.delta_V[time_period]
         rs2 = self.road_info[id2]
@@ -72,7 +73,7 @@ class roadmap:
                 same_num += 1
         return same_num / indice
 
-    def get_1hop(self, id, rate):
+    def get_1hop(self, id):  # 建立模型，只考虑上游影响
         start_id, end_id = self.roads[id]
         start_ids = self.start_ids
         end_ids = self.end_ids
@@ -105,13 +106,13 @@ class roadmap:
 
         return A1, E1
 
-    def get_info(self, id, data_dir, time_period, rate):
+    def get_info(self, id, data_dir, time_period, rate):  # 更新模型的信息
         rs = self.road_info[id]
         start_id, end_id = self.roads[id]
         rs.start_id = start_id
         rs.end_id = end_id
 
-        A1, E1 = self.get_1hop(id, rate)
+        A1, E1 = self.get_1hop(id)
         # print(id, A1)
         rs.A1 = A1
         rs.UE |= E1
@@ -135,7 +136,7 @@ class roadmap:
 
         return
 
-    def cov_sup(self, seed, sup_rate):
+    def cov_sup(self, seed, sup_rate):  # 对于某个种子集合的支持数和覆盖数的加权和
         res = 0
         cov_set = set()
 
@@ -157,9 +158,10 @@ class roadmap:
 
         return res
 
-    def seed_select(self, seed_rate, rate, sup_rate):
+    def seed_select(self, seed_rate, sup_rate):  # 贪心算法求种子集合
         seed = set()
         K = int(seed_rate * len(self.roads))
+        next_seed = ''
         while len(seed) <= K:
             max_rise = 0
             cov_sup_pre = self.cov_sup(seed, sup_rate)
@@ -175,48 +177,17 @@ class roadmap:
                     max_rise = cur_rise
                     next_seed = r
                     # print(r, cur_rise)
-            seed.add(next_seed)
+
+            un_seeds = self.roads.keys() - seed
+            if next_seed not in seed:
+                seed.add(next_seed)
+            else:
+                seed.add(un_seeds.pop())
             # break
         self.seeds = seed
         return seed
 
-    def trend_infer(self, id, date, time_period, rate):
-        rs = self.road_info[id]
-        seed = self.seeds
-        p_max = 0
-        delta_v_max = -1
-        delta_v_dict = dict()
-        for r in rs.UN:
-            if r in seed:
-                rs_temp = self.road_info[r]
-                delta_v_dict[r] = rs_temp.delta_V[time_period][date]
-            else:
-                delta_v_dict[r] = -1
-        non_seed = list(rs.UN - seed)
-
-        for i in range(2**len(non_seed)):
-            p = 0
-            bin_arr = list(map(int, bin(i)[2:]))
-            index_diff = len(non_seed) - len(bin_arr)
-            for j in range(len(bin_arr)):
-                if bin_arr[j] == 1:
-                    r_id = non_seed[index_diff + j]
-                    delta_v_dict[r_id] = 1
-
-            for edge in rs.UE:
-                sid, eid = edge.split('-')
-                if delta_v_dict[sid] == delta_v_dict[eid]:
-                    p += math.log10(self.corr(sid, eid, time_period, rate))
-                else:
-                    p += math.log10(
-                        1 - min(self.corr(sid, eid, time_period, rate), 0.999))
-
-            if p > p_max:
-                p_max = p
-                delta_v_max = delta_v_dict[rs.id]
-        return delta_v_max
-
-    def speed_diff_est(self, id, date, time_period):
+    def speed_diff_est(self, id, date, time_period):  # 速度差值估计
         rs = self.road_info[id]
         # UnS = rs.UN & self.seeds
         sde = 0
@@ -232,7 +203,7 @@ class roadmap:
 
         return sde
 
-    def weight_learn(self, id, rate, time_period, threshold, alpha):
+    def weight_learn(self, id, rate, time_period, threshold, alpha):  # 权值学习
         # seed = self.seeds
         rs = self.road_info[id]
         indexes = dates
@@ -249,7 +220,6 @@ class roadmap:
                 diff_pre.append(self.speed_diff_est(id, date, time_period))
                 indice += 1
             # mean_pre = sum(diff_pre) / indice
-            pre_diff_arr = np.array(diff_pre)
             delta_fun_pre = copy.deepcopy(delta_fun)
             for edge in rs.W:
                 temp1 = 0
@@ -278,27 +248,18 @@ class roadmap:
                 date = indexes[i]
                 diff.append(self.speed_diff_est(id, date, time_period))
             # mean = sum(diff) / indice
-            diff_arr = np.array(diff)
-            abs_diff = np.linalg.norm(diff_arr - pre_diff_arr)
-            # print(diff_arr, pre_diff_arr)
-            # print('diff_norm', abs_diff)
-            # print(np.linalg.norm(pre_diff_arr))
             delta_diff = 0
             for edge in rs.UE:
                 delta_diff += abs(delta_fun[edge] - delta_fun_pre[edge])
-            if delta_diff / len(rs.UE) < threshold:
+            if delta_diff / len(rs.UE) < threshold:  # 收敛条件为相邻迭代的梯度增长值小于阈值
                 break
 
-            # if abs_diff < threshold:
-            #     break
             iter += 1
             # break
         self.road_info[id] = rs
-        # print('iter:', iter, delta_diff / len(rs.UE))
-        # print(delta_fun, delta_fun_pre)
         return
 
-    def online_est(self, id, date, time_period, rate):
+    def online_est(self, id, date, time_period, rate):  # 在线估计
         rs = self.road_info[id]
         indexes = rs.V.index
         indice = 0
@@ -308,10 +269,7 @@ class roadmap:
         if len(rs.UN & self.seeds) == 0:
             return v_mean
 
-        # delta_v = self.trend_infer(id, date, time_period, rate)
         v_diff_est = self.speed_diff_est(id, date, time_period)
-        # print('diff_est', v_diff_est)
-        # print('mean', v_mean)
         v_est = v_mean + v_diff_est
 
         return v_est
