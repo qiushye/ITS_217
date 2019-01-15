@@ -4,16 +4,17 @@
 '''
 import os
 import datetime
+import numpy as np
 
 cur_dir = os.path.split(os.path.realpath(__file__))[0]
 data_dir = cur_dir + '/data/'
 result_dir = cur_dir + '/result/'
 
-dates = [
+dates = np.array([
     '2012-11-07', '2012-11-08', '2012-11-09', '2012-11-10', '2012-11-11',
     '2012-11-12', '2012-11-13', '2012-11-14', '2012-11-15', '2012-11-16',
     '2012-11-17', '2012-11-18', '2012-11-19', '2012-11-20', '2012-11-21'
-]
+])
 
 weekday, weekend = [], []
 weekday_index, weekend_index = [], []
@@ -28,6 +29,8 @@ for i in range(len(dates)):
         weekend.append(date)
         weekend_index.append(i)
 
+weekday = np.array(weekday)
+weekend = np.array(weekend)
 # print(weekday, weekend)
 
 # dates = dates[:8]

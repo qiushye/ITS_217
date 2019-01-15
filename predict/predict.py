@@ -7,7 +7,7 @@ matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import sys
 import math
-from init import dates, data_dir, result_dir,weekday
+from init import dates, data_dir, result_dir, weekday
 dates = weekday
 from population import population
 from knn_predict import data_knn
@@ -297,10 +297,7 @@ def compare_res(RN, params):  # 一阶模型和遗传优化、真实速度的对
     # ax.plot(
     #     range(len(roads)), weight_est_list, label='$weight-speed$', color='g')
     ax.plot(range(len(roads)), ga_est_list, label='$ga-speed$', color='y')
-    # for i, (_x, _y) in enumerate(zip(range(len(roads)), ori_list)):
-    #     plt.text(_x, _y, roads[i], color='black', fontsize=12)
     plt.legend(loc='best')
-    # plt.show()
     plt.savefig(
         result_dir + time_period + '_' + test_date + '_compare_speeds.png',
         bbox_inches='tight')

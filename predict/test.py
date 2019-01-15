@@ -11,8 +11,20 @@ markers = ['o', '*', 'D', '^']
 colors = {'KNN': 'ro-', 'LSTM': 'b*--', 'ONE-HOP': 'y', 'HA': 'b'}
 roads = range(34)
 
-df = pd.DataFrame(np.random.rand(6, 4), columns=methods)
-df.plot(style=colors)
+res_dict = {}
+for m in methods:
+    res_dict[m] = np.random.rand(6)
+
+df = pd.DataFrame(
+    np.array(list(res_dict.values())).T,
+    columns=res_dict.keys(),
+    index=list(range(5, 11)))
+df = abs(df.sub(df['HA'], axis=0).div(df['HA'], axis=0))
+df = df.drop(['HA'], axis=1)
+df.to_csv('test.csv', sep=',')
+df.plot(style=colors, grid=True)
+plt.xlabel('times')
+plt.ylabel('mre')
 plt.show()
 
 # df = pd.DataFrame(np.random.rand(50, 4), columns=['a', 'b', 'c', 'd'])

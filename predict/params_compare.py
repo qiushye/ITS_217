@@ -17,112 +17,70 @@ def seed_rate_vary(RN, params):
     time_period = params['time_period']
     test_start = params['test_start']
 
-    indexes = np.array(range(test_start, len(dates)))
+    date_cols = list(range(test_start, len(dates)))
+    print(dates[date_cols])
     rates = np.array([i * 10 for i in range(1, 7)])  # 种子数百分比
     rmse_df = pd.DataFrame(
-        np.zeros((len(rates), len(indexes))), index=rates, columns=indexes)
+        np.zeros((len(rates), len(date_cols))),
+        index=rates,
+        columns=dates[date_cols])
     mre_df = copy.deepcopy(rmse_df)
     for i in rates:
         params['seed_rate'] = i / 100
 
-        for test_start in indexes:
+        for test_start in date_cols:
             temp_RN = copy.deepcopy(RN)
             test_date = dates[test_start]
             params['test_date'] = test_date
             est_RN, _, _ = ga_knn_opt(temp_RN, params)
             rmse, mre = evaluate(RN, est_RN, time_period, test_date)
-            rmse_df[test_start][i] = rmse
-            mre_df[test_start][i] = mre
+            rmse_df[test_date][i] = rmse
+            mre_df[test_date][i] = mre
     # print(rmse_df)
 
     res_dir = result_dir + 'params_compare/'
     if not os.path.exists(res_dir):
         os.mkdir(res_dir)
+    path_prefix = res_dir + time_period + '_seed_rate_'
 
-    markers = ['o', 'o', '*', 'D', '^']
-    colors = ['b', 'r', 'b', 'y', 'g']
+    markers = ['o', '*', 'D', '^']
+    colors = ['b', 'r', 'y', 'g']
+    style_dict = {}
+    for col in date_cols:
+        m = col // len(colors)
+        c = col % len(colors)
+        style_dict[dates[col]] = markers[m] + colors[c] + '--'
 
-    # RMSE结果保存
-    rmse_fw = open(res_dir + time_period + '_seed_rate_rmse.csv', 'w')
-    rmse_fw.write(',' + ','.join([str(i) for i in rates]) + '\n')
+    rmse_df.to_csv(path_prefix + 'rmse.csv', columns=dates[date_cols], sep=',')
+    mre_df.to_csv(path_prefix + 'mre.csv', columns=dates[date_cols], sep=',')
 
-    k = 0
-    # fig = plt.gcf()
-    # fig.set_size_inches(20, 10)
-
-    for test_start in indexes:
-        test_date = dates[test_start]
-        rmse_list = rmse_df[test_start]
-
-        rmse_fw.write(test_date + ',')
-        rmse_fw.write(','.join([str(rmse) for rmse in rmse_list]) + '\n')
-
-        ax1 = plt.subplot()
-        ax1.set_xlabel("seeds_rate(%)")
-        ax1.set_ylabel('RMSE(100km/h)')
-        ax1.yaxis.grid(True, linestyle='--')
-        ax1.xaxis.grid(True, linestyle='--')
-
-        ax1.plot(
-            rates,
-            rmse_list,
-            label='$' + test_date + '$',
-            marker=markers[k],
-            linestyle='-',
-            color=colors[k])
-        k += 1
-
+    rmse_df.plot(style=style_dict, grid=True)
+    plt.xlabel("seeds_rate(%)")
+    plt.ylabel('RMSE(100km/h)')
     plt.legend(loc='upper right')
-    plt.savefig(res_dir + time_period + '_seed_rate_rmse.png')
+    plt.savefig(path_prefix + 'rmse.png')
     plt.close()
-    rmse_fw.close()
 
-    # MRE结果保存
-    mre_fw = open(res_dir + time_period + '_seed_rate_mre.csv', 'w')
-    mre_fw.write(',' + ','.join([str(i) for i in rates]) + '\n')
-    k = 0
-    for test_start in indexes:
-        test_date = dates[test_start]
-        mre_list = mre_df[test_start]
-        mre_fw.write(test_date + ',')
-        mre_fw.write(','.join([str(mre) for mre in mre_list]) + '\n')
-
-        ax2 = plt.subplot()
-        ax2.set_xlabel("seeds_rate(%)")
-        ax2.set_ylabel('MRE')
-        ax2.yaxis.grid(True, linestyle='--')
-        ax2.xaxis.grid(True, linestyle='--')
-        ax2.plot(
-            rates,
-            mre_list,
-            label='$' + test_date + '$',
-            marker=markers[k],
-            linestyle='-',
-            color=colors[k])
-        k += 1
-
+    mre_df.plot(style=style_dict, grid=True)
+    plt.xlabel("seeds_rate(%)")
+    plt.ylabel('MRE')
     plt.legend(loc='upper right')
-    plt.savefig(res_dir + time_period + '_seed_rate_mre.png')
+    plt.savefig(path_prefix + 'mre.png')
     plt.close()
-    mre_fw.close()
+
     return
 
 
 def train_end_vary(RN, params):
     time_period = params['time_period']
-    column = ['next-day', 'fixed-date']
+
+    cols = ['next-day', 'fixed-date']
     indexes = range(6, 10)
     rmse_df = pd.DataFrame(
-        np.zeros((len(indexes), len(column))), index=indexes, columns=column)
+        np.zeros((len(indexes), len(cols))), index=indexes, columns=cols)
     mre_df = copy.deepcopy(rmse_df)
 
     for train_end in indexes:
-        RN = road_network.roadmap(roads_path, train_end,
-                                  data_dir + str(interval) + '_impute/')
-
-        temp_RN = copy.deepcopy(RN)
-        fixed_RN = copy.deepcopy(RN)
-
         # 训练集后一天的预测
         test_start = train_end
         train_rate = train_end / len(dates)
@@ -131,6 +89,15 @@ def train_end_vary(RN, params):
         params['test_start'] = test_start
         params['train_rate'] = train_rate
         params['test_date'] = test_date
+
+        RN = road_network.roadmap(roads_path, train_end,
+                                  data_dir + str(interval) + '_impute/')
+
+        for r in RN.roads:
+            RN.get_info(r, data_dir, time_period, train_rate)
+
+        temp_RN = copy.deepcopy(RN)
+        fixed_RN = copy.deepcopy(RN)
 
         est_RN, _, _ = estimate(temp_RN, params)
         rmse, mre = evaluate(RN, est_RN, time_period, test_date)
@@ -149,9 +116,31 @@ def train_end_vary(RN, params):
         mre_df['fixed-date'][train_end] = mre
 
     res_dir = result_dir + 'params_compare/'
+    if not os.path.exists(res_dir):
+        os.mkdir(res_dir)
+    path_prefix = res_dir + time_period + '_train_'
 
-    markers = ['o', 'o', '*', 'D', '^']
-    colors = ['b', 'r', 'b', 'y', 'g']
+    style_dict = {'next-day': 'ob-', 'fixed-date': 'or-'}
+    # markers = ['o', 'o', '*', 'D', '^']
+    # colors = ['b', 'r', 'b', 'y', 'g']
+
+    rmse_df.to_csv(path_prefix + 'rmse.csv', columns=cols, sep=',')
+    mre_df.to_csv(path_prefix + 'mre.csv', columns=cols, sep=',')
+
+    rmse_df.plot(style=style_dict, grid=True)
+    plt.xlabel("train days")
+    plt.ylabel('RMSE(100km/h)')
+    plt.legend(loc='upper right')
+    plt.savefig(path_prefix + 'rmse.png')
+    plt.close()
+
+    mre_df.plot(style=style_dict, grid=True)
+    plt.xlabel("train days")
+    plt.ylabel('MRE')
+    plt.legend(loc='upper right')
+    plt.savefig(path_prefix + 'mre.png')
+    plt.close()
+    '''
     rmse_fw = open(res_dir + time_period + '_train_rmse.csv', 'w')
     rmse_fw.write(',' + ','.join([str(i) for i in indexes]) + '\n')
     k = 0
@@ -207,7 +196,7 @@ def train_end_vary(RN, params):
     plt.savefig(res_dir + time_period + '_train_mre.png')
     plt.close()
     mre_fw.close()
-
+    '''
     return
 
 
@@ -244,5 +233,5 @@ if __name__ == '__main__':
     for r in RN.roads:
         RN.get_info(r, data_dir, time_period, train_rate)
 
-    seed_rate_vary(RN, params)
-    # train_end_vary(RN, params)
+    # seed_rate_vary(RN, params)
+    train_end_vary(RN, params)

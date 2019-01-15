@@ -13,6 +13,16 @@ import math
 import scipy.io as scio
 import copy
 
+methods = ['ori', 'HA', 'KNN', 'LSTM', 'ONE-HOP', 'OHKG']
+markers = ['o', '^', '*']
+colors = ['b', 'r', 'y']
+style_dict = {}
+for i in range(len(methods)):
+    col = methods[i]
+    m = i // len(colors)
+    c = i % len(colors)
+    style_dict[col] = markers[m] + colors[c] + '--'
+
 
 def extract_data(data_dir, interval):
     times_data = {}
@@ -112,7 +122,7 @@ def compare(interval, train_end, test_start, params):
     knn_Y_predict = np.reshape(knn_Y_predict, len(un_seeds))
     predict_result['KNN'] = knn_Y_predict
     print(time.time() - time_e, 's')
-    
+
     # lstm预测
     time_s = time.time()
     n_step = 3
@@ -129,7 +139,7 @@ def compare(interval, train_end, test_start, params):
     lstm_Y_predict = np.array(lstm_Y_predict)
     lstm_Y_predict = lstm_Y_predict.reshape(len(un_seeds))
     predict_result['LSTM'] = lstm_Y_predict
-    
+
     # OHKG
     ohkg_RN = copy.deepcopy(RN)
     est_RN, _, _ = ga_knn_opt(ohkg_RN, params)
@@ -141,7 +151,7 @@ def compare(interval, train_end, test_start, params):
     one_hop_Y_predict = np.array(one_hop_Y_predict)
     one_hop_Y_predict = one_hop_Y_predict.reshape(len(un_seeds))
     predict_result['OHKG'] = one_hop_Y_predict
-    
+
     # one_hop_model预测
     one_hop_RN = copy.deepcopy(RN)
     time_s = time.time()
@@ -156,7 +166,7 @@ def compare(interval, train_end, test_start, params):
     one_hop_Y_predict = one_hop_Y_predict.reshape(len(un_seeds))
     predict_result['ONE-HOP'] = one_hop_Y_predict
     print(time.time() - time_e, 's')
-    
+
     # 历史平均预测
     time_s = time.time()
     HAI_Y_predict = []
@@ -169,7 +179,7 @@ def compare(interval, train_end, test_start, params):
     predict_result['HA'] = HAI_Y_predict
     time_e = time.time()
     print('ha', str(time_e - time_s) + 's')
-    
+
     return predict_result, un_seeds
 
 
@@ -179,85 +189,36 @@ def roads_result(interval, train_end, test_start, params):
         os.mkdir(res_dir)
 
     time_period = params['time_period']
-    # methods = ['HA', 'KNN', 'LSTM', 'ONE-HOP', 'ori']
-    methods = ['KNN', 'ONE-HOP', 'OHKG', 'ori']
-    markers = ['o', '^', '*', 'D', 'o']
-    colors = ['b', 'r', 'y', 'b', 'g']
+
+    # methods = ['KNN', 'ONE-HOP', 'OHKG', 'ori']
 
     predict_res, un_seeds = compare(interval, train_end, test_start, params)
 
-    ax = plt.subplot()
-    ax.set_xlabel("roads_order")
-    ax.set_ylabel('MRE')
-    ax.yaxis.grid(True, linestyle='--')
-    ax.xaxis.grid(True, linestyle='--')
-    k = 0
-    fw = open(
-        res_dir + str(test_start) + 'day_' + time_period + '_roads_mre.csv',
-        'w')
-    fw.write(',' + ','.join(un_seeds) + '\n')
-    for method in methods:
-        if method in ['ori']:
-            k += 1
-            continue
+    speed_df = pd.DataFrame(
+        np.array(list(predict_res.values())).T,
+        index=un_seeds,
+        columns=predict_res.keys())
 
-        mre_arr = abs(predict_res[method] -
-                      predict_res['ori']) / predict_res['ori']
-        print(method, mre_arr.shape)
-        fw.write(method + ',')
-        fw.write(','.join([str(round(mre, 3)) for mre in mre_arr]) + '\n')
-        # if method == 'LSTM':
-        #     method = 'OHKG'
-        #     mre_arr += 0.02
-        ax.plot(
-            range(len(un_seeds)),
-            mre_arr,
-            label='$' + method + '$',
-            marker=markers[k],
-            linestyle='-',
-            color=colors[k])
-        k += 1
+    path_prefix = res_dir + str(test_start) + 'day_' + time_period + '_roads_'
 
-    fw.close()
+    speed_df.to_csv(path_prefix + 'speed.csv', sep=',')
+    speed_df.plot(style=style_dict, grid=True)
+    plt.xlabel("roads_order")
+    plt.ylabel('speed(km/h)')
     plt.legend(loc='upper right')
-    plt.savefig(res_dir + str(test_start) + 'day_' + time_period +
-                '_methods_roads_MRE.png')
+    plt.savefig(path_prefix + 'speed.png')
     plt.close()
 
-    ax = plt.subplot()
-    ax.set_xlabel("roads_order")
-    ax.set_ylabel('speed')
-    ax.yaxis.grid(True, linestyle='--')
-    ax.xaxis.grid(True, linestyle='--')
-    k = 0
-    fw = open(
-        res_dir + 'speed_res/' + str(test_start) + 'day_' + time_period +
-        '_roads_speed_compare.csv', 'w')
-    fw.write(',' + ','.join(un_seeds) + '\n')
-    for method in methods:
-        # if method == 'ori':
-        #     continue
+    mre_df = abs(
+        speed_df.sub(speed_df['ori'], axis=0).div(speed_df['ori'], axis=0))
+    mre_df = mre_df.drop(['ori'], axis=1)
 
-        speed_arr = predict_res[method] * 100
-        fw.write(method + ',')
-        fw.write(','.join([str(round(speed, 1))
-                           for speed in speed_arr]) + '\n')
-        # if method == 'LSTM':
-        #     method = 'OHKG'
-        #     speed_arr += 4
-        ax.plot(
-            range(len(un_seeds)),
-            speed_arr,
-            label='$' + method + '$',
-            marker=markers[k],
-            linestyle='-',
-            color=colors[k])
-        k += 1
-
-    fw.close()
+    mre_df.to_csv(path_prefix + 'mre.csv', sep=',')
+    mre_df.plot(style=style_dict, grid=True)
+    plt.xlabel("roads_order")
+    plt.ylabel('MRE')
     plt.legend(loc='upper right')
-    plt.savefig(res_dir + 'speed_res/' + str(test_start) + 'day_' +
-                time_period + '_methods_roads_speed.png')
+    plt.savefig(path_prefix + 'mre.png')
     plt.close()
     return
 
@@ -297,37 +258,7 @@ def periods_compare(interval, train_end, test_start, params):
         mae_result[method] = abs(df - ori_df)
         mre_result[method] = mae_result[method] / ori_df
         rmse_result[method] = (df - ori_df)**2
-
-    markers = ['o', '*', 'D', '^']
-    colors = ['r', 'b', 'y', 'g']
-
-    ax = plt.subplot()
-    ax.set_xlabel("roads_order")
-    ax.set_ylabel('MRE')
-    ax.yaxis.grid(True, linestyle='--')
-    ax.xaxis.grid(True, linestyle='--')
-    k = 0
-    fw = open(result_dir + 'roads_mre.csv', 'w')
-    fw.write(',' + ','.join(un_seeds) + '\n')
-    for method in methods:
-        if method == 'ori':
-            continue
-        fw.write(method + ',')
-        mre_arr = np.mean(mre_result.values, axis=0)
-        fw.write(','.join([str(round(v, 3)) for v in mre_arr]) + '\n')
-        ax.plot(
-            range(len(un_seeds)),
-            mre_arr,
-            label='$' + method + '$',
-            marker=markers[k],
-            linestyle='-',
-            color=colors[k])
-        k += 1
-
-    fw.close()
-    plt.legend(loc='best')
-    plt.savefig(result_dir + 'roads_mre.png')
-    plt.close()
+        # dataframe plot
 
     return
 
@@ -380,87 +311,29 @@ def dims_result(res_dir):
     roads_res['MRE'] = np.mean(MRE_tensor, axis=0)
     roads_res['RMSE'] = np.sqrt(np.mean(RMSE_tensor, axis=0))
 
-    # for eva in eva_list:
-    #     scio.savemat(result_dir + 'periods_' + eva + '.mat',
-    #                  {eva: periods_res[eva]})
-    #     scio.savemat(result_dir + 'roads_' + eva + '.mat',
-    #                  {eva: roads_res[eva]})
-
-    markers = ['o', '*', 'D', '^']
-    colors = ['r', 'b', 'y', 'g']
-
     for eva in eva_list:
-        ax = plt.subplot()
-        ax.set_xlabel("periods")
-        ax.set_ylabel(eva)
-        ax.yaxis.grid(True, linestyle='--')
-        ax.xaxis.grid(True, linestyle='--')
-
-        for i in range(4):
-            ax.plot(
-                periods,
-                periods_res[eva][:, i],
-                color=colors[i],
-                marker=markers[i],
-                label='$' + methods[i + 1] + '$',
-                linestyle='-')
-
-        plt.legend(loc='best')
-        plt.savefig(result_dir + 'periods_compare_' + eva + '.png')
-        plt.close()
-
-    for eva in eva_list:
-        ax = plt.subplot()
-        ax.set_xlabel("roads_order")
-        ax.set_ylabel(eva)
-        ax.yaxis.grid(True, linestyle='--')
-        ax.xaxis.grid(True, linestyle='--')
-
-        for i in range(4):
-            ax.plot(
-                range(len(un_seeds)),
-                roads_res[eva][i, :],
-                color=colors[i],
-                marker=markers[i],
-                label='$' + methods[i + 1] + '$',
-                linestyle='-')
-
-        plt.legend(loc='best')
-        plt.savefig(result_dir + 'roads_compare_' + eva + '.png')
-        plt.close()
-
+        scio.savemat(result_dir + 'periods_' + eva + '.mat',
+                     {eva: periods_res[eva]})
+        scio.savemat(result_dir + 'roads_' + eva + '.mat',
+                     {eva: roads_res[eva]})
     return
 
 
 def roads_plot(time_period):
     methods = ['HA', 'KNN', 'LSTM', 'ONE-HOP']
     eva_list = ['MAE', 'MRE', 'RMSE']
-    markers = ['o', '*', 'D', '^']
-    colors = ['r', 'b', 'y', 'g']
+    ylabel = {'MAE': 'MAE(km/h)', 'RMSE': 'RMSE(km/h)', 'MRE': 'MRE'}
 
+    path_prefix = result_dir + 'methods_compare/' + time_period + '_roads_'
     for eva in eva_list:
-        arr = scio.loadmat(result_dir + 'roads_' + eva + '.mat')[eva]
-        print(arr.shape)
-        # un_seeds_list = range(len(data))
-        ax = plt.subplot()
-        ax.set_xlabel("roads_order")
-        ax.set_ylabel(eva)
-        ax.yaxis.grid(True, linestyle='--')
-        ax.xaxis.grid(True, linestyle='--')
+        arr = scio.loadmat(result_dir + 'roads_' + eva + '.mat')[eva].T
 
-        for i in range(4):
-            data = arr[i, :]
-            ax.plot(
-                range(len(data)),
-                data,
-                color=colors[i],
-                marker=markers[i],
-                label='$' + methods[i] + '$',
-                linestyle='-')
-
+        df = pd.DataFrame(arr, index=range(arr.shape[0]), columns=methods)
+        df.plot(grid=True, style=style_dict)
+        plt.xlabel('roads')
+        plt.ylabel(ylabel[eva])
         plt.legend(loc='upper right')
-        plt.savefig(result_dir + 'methods_compare/' + time_period + '_roads_' +
-                    eva + '.png')
+        plt.savefig(path_prefix + eva + '.png')
         plt.close()
     return
 
@@ -468,33 +341,20 @@ def roads_plot(time_period):
 def periods_plot():
     methods = ['HA', 'KNN', 'LSTM', 'ONE-HOP']
     eva_list = ['MAE', 'MRE', 'RMSE']
-    markers = ['o', '*', 'D', '^']
-    colors = ['r', 'b', 'y', 'g']
+    ylabel = {'MAE': 'MAE(km/h)', 'RMSE': 'RMSE(km/h)', 'MRE': 'MRE'}
 
+    path_prefix = result_dir + 'methods_compare/' + time_period + '_periods_'
     for eva in eva_list:
         arr = scio.loadmat(result_dir + 'periods_' + eva + '.mat')[eva]
 
-        # un_seeds_list = range(len(data))
-        ax = plt.subplot()
-        ax.set_xlabel("periods")
-        ax.set_ylabel(eva)
-        ax.yaxis.grid(True, linestyle='--')
-        ax.xaxis.grid(True, linestyle='--')
-
-        for i in range(4):
-            data = arr[:, i]
-            ax.plot(
-                range(len(data)),
-                data,
-                color=colors[i],
-                marker=markers[i],
-                label='$' + methods[i] + '$',
-                linestyle='-')
-
+        df = pd.DataFrame(arr, index=range(arr.shape[0]), columns=methods)
+        df.plot(grid=True, style=style_dict)
+        plt.xlabel('periods')
+        plt.ylabel(ylabel[eva])
         plt.legend(loc='upper right')
-        plt.savefig(result_dir + 'methods_compare/' + time_period +
-                    '_periods_' + eva + '.png')
+        plt.savefig(path_prefix + eva + '.png')
         plt.close()
+
     return
 
 
@@ -527,6 +387,6 @@ if __name__ == '__main__':
     # dims_result(dims_res_dir)
     # for period in range(4,48):
     #     params['time_period'] = str(period)
-    roads_result(interval, train_end, test_start, params)
-    # roads_plot(time_period)
+    # roads_result(interval, train_end, test_start, params)
+    roads_plot(time_period)
     # periods_plot()
